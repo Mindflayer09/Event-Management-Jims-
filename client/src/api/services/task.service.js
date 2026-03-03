@@ -1,0 +1,10 @@
+import api from '../axios';
+
+export const getAllTasks = (params) => api.get('/tasks', { params });
+export const getTaskById = (id) => api.get(`/tasks/${id}`);
+export const createTask = (data) => api.post('/tasks', data);
+export const updateTask = (id, data) => api.put(`/tasks/${id}`, data);
+export const deleteTask = (id) => api.delete(`/tasks/${id}`);
+export const submitTask = (id, data) => api.post(`/tasks/${id}/submit`, data);
+export const approveTask = (id) => api.patch(`/tasks/${id}/approve`);
+export const rejectTask = (id, data) => api.patch(`/tasks/${id}/reject`, data);

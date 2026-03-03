@@ -1,0 +1,66 @@
+const mongoose = require('mongoose');
+const { EVENT_PHASES } = require('../utils/constants');
+
+const mediaSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    fileType: { type: String, required: true },
+    publicId: { type: String },
+  },
+  { _id: false, timestamps: true }
+);
+
+const eventSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: [true, 'Event title is required'],
+      trim: true,
+      maxlength: 200,
+    },
+    description: {
+      type: String,
+      required: [true, 'Event description is required'],
+      trim: true,
+    },
+    club: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Club',
+      required: [true, 'Club is required'],
+    },
+    phase: {
+      type: String,
+      enum: Object.values(EVENT_PHASES),
+      default: EVENT_PHASES.PRE,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    isPublic: {
+      type: Boolean,
+      default: false,
+    },
+    isFinalized: {
+      type: Boolean,
+      default: false,
+    },
+    media: [mediaSchema],
+    report: {
+      type: String,
+      default: '',
+    },
+    budget: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { timestamps: true }
+);
+
+eventSchema.index({ club: 1 });
+eventSchema.index({ phase: 1 });
+eventSchema.index({ isPublic: 1 });
+
+module.exports = mongoose.model('Event', eventSchema);
