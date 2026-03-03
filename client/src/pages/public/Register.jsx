@@ -121,7 +121,7 @@ export default function Register() {
                 {...register('password')}
               />
               <span
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700"
+                className="absolute right-3 inset-y-0 flex items-center px-2 text-gray-500 hover:text-gray-700 cursor-pointer"
                 onClick={() => setPasswordVisible(!passwordVisible)}
               >
                 {passwordVisible ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -139,7 +139,7 @@ export default function Register() {
                 {...register('confirmPassword')}
               />
               <span
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700"
+                className="absolute right-3 inset-y-0 flex items-center px-2 text-gray-500 hover:text-gray-700 cursor-pointer"
                 onClick={() => setConfirmVisible(!confirmVisible)}
               >
                 {confirmVisible ? <EyeOff size={20} /> : <Eye size={20} />}
