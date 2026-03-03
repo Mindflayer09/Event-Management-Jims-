@@ -81,7 +81,7 @@ export default function Login() {
                 {...register('password')}
               />
               <span
-                className="absolute right-3 inset-y-0 flex items-center px-2 text-gray-500 hover:text-gray-700 cursor-pointer"
+                className="absolute right-1 inset-y-12 flex items-center px-2 text-gray-500 hover:text-gray-700 cursor-pointer"
                 onClick={() => setPasswordVisible(!passwordVisible)}
               >
                 {passwordVisible ? <EyeOff size={20} /> : <Eye size={20} />}
