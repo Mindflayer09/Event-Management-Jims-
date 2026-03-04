@@ -27,7 +27,8 @@ const schema = z
 
 export default function Register() {
   
-  const { register: registerUser, user: currentUser } = useAuth();
+  // 🔥 Added login here
+  const { register: registerUser, login, user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -75,14 +76,20 @@ export default function Register() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
+      // 1. Register the user in the database
       await registerUser(data);
 
+      // 🔥 2. Role-based login and redirection logic
       if (data.role === 'admin') {
-        toast.success('Admin registered successfully! You can now login.');
+        // Automatically log the Admin in
+        await login(data.email, data.password);
+        toast.success('Admin registered successfully! Welcome to your dashboard.');
+        navigate('/admin/dashboard', { replace: true });
       } else {
-        toast.success('Registration successful! Please wait for admin approval.');
+        // Volunteers and Sub-Admins get sent to login to await approval
+        toast.success('Registration successful! Please wait for admin approval to log in.');
+        navigate('/login');
       }
-      navigate('/login');
     } catch (err) {
       toast.error(err.message || 'Registration failed');
     } finally {
