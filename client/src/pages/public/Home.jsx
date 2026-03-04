@@ -1,26 +1,46 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Added useNavigate
 import { getClubs } from '../../api/services/club.service';
 import { Users, ArrowRight, Calendar } from 'lucide-react';
 import Spinner from '../../components/common/Spinner';
+import { useAuth } from '../../context/AuthContext'; // Added useAuth
 
 export default function Home() {
   const [clubs, setClubs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user, isAuthenticated } = useAuth(); // Destructure auth state
+  const navigate = useNavigate();
 
   useEffect(() => {
-  const fetchClubs = async () => {
-    try {
-      const clubs = await getClubs();
-      setClubs(clubs);
-    } catch (err) {
-      console.error('Failed to load clubs:', err);
-    } finally {
-      setLoading(false);
+    const fetchClubs = async () => {
+      try {
+        const clubsData = await getClubs();
+        setClubs(clubsData);
+      } catch (err) {
+        console.error('Failed to load clubs:', err);
+      } finally {
+        setClubs(prev => Array.isArray(prev) ? prev : []); // Safety check
+        setLoading(false);
+      }
+    };
+    fetchClubs();
+  }, []);
+
+  // helper function to handle navigation for clubs
+  const handleClubNavigation = (clubId) => {
+    if (isAuthenticated && user) {
+      // Logic for redirecting logged-in users
+      const routes = {
+        admin: '/admin/dashboard',
+        'sub-admin': '/subadmin/dashboard',
+        volunteer: '/volunteer/dashboard',
+      };
+      navigate(routes[user.role] || '/');
+    } else {
+      // Logic for guests
+      navigate(`/register?club=${clubId}`);
     }
   };
-  fetchClubs();
-}, []);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
@@ -35,18 +55,25 @@ export default function Home() {
             <Link to="/reports" className="text-sm text-gray-600 hover:text-gray-900">
               Public Reports
             </Link>
-            <Link
-              to="/login"
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
-            >
-              Login
-            </Link>
-            <Link
-              to="/register"
-              className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              Register
-            </Link>
+            
+            {/* DYNAMIC HEADER BUTTONS */}
+            {isAuthenticated ? (
+              <button
+                onClick={() => handleClubNavigation()}
+                className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            ) : (
+              <>
+                <Link to="/login" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                  Login
+                </Link>
+                <Link to="/register" className="text-sm font-medium bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                  Register
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -75,10 +102,10 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {clubs.map((club) => (
-              <Link
+              <div
                 key={club._id}
-                to={`/register?club=${club._id}`}
-                className="group bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 transition-all duration-200"
+                onClick={() => handleClubNavigation(club._id)}
+                className="cursor-pointer group bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 transition-all duration-200"
               >
                 <div className="flex items-start justify-between">
                   <div className="h-12 w-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
@@ -92,7 +119,7 @@ export default function Home() {
                 <p className="mt-2 text-sm text-gray-500 line-clamp-2">
                   {club.description}
                 </p>
-              </Link>
+              </div>
             ))}
           </div>
         )}

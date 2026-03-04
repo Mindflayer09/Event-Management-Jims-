@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import RequireRole from '../components/RequireRole';
+import Spinner from '../components/common/Spinner'; // Make sure to import Spinner
 
 // Public pages
 import Home from '../pages/public/Home';
@@ -31,13 +32,24 @@ import SubmitTask from '../pages/volunteer/SubmitTask';
 import NotFound from '../pages/NotFound';
 
 function DashboardRedirect() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth(); // Added loading state
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/login" replace />;
+  
   const routes = {
     admin: '/admin/dashboard',
     'sub-admin': '/subadmin/dashboard',
     volunteer: '/volunteer/dashboard',
   };
+  
   return <Navigate to={routes[user.role] || '/'} replace />;
 }
 
@@ -54,30 +66,30 @@ export default function AppRoutes() {
           <Route path="/dashboard" element={<DashboardRedirect />} />
           <Route path="/register-admin" element={<RegisterAdmin />} />
 
-          {/* Admin routes */}
+          {/* Admin routes (Only Admin) */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/admin/dashboard" element={ <RequireRole role="admin"> <AdminDashboard /> </RequireRole>}/>
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<ManageUsers />} />
               <Route path="/admin/events" element={<ManageEvents />} />
               <Route path="/admin/tasks" element={<ManageTasks />} />
             </Route>
           </Route>
 
-          {/* Sub-admin routes */}
-          <Route element={<ProtectedRoute allowedRoles={['sub-admin']} />}>
+          {/* Sub-admin routes (Admin & Sub-Admin can access) */}
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'sub-admin']} />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/subadmin/dashboard" element={ <RequireRole role="sub-admin"> <SubAdminDashboard /> </RequireRole>}/>
+              <Route path="/subadmin/dashboard" element={<SubAdminDashboard />} />
               <Route path="/subadmin/events" element={<MyEvents />} />
               <Route path="/subadmin/tasks" element={<DelegateTasks />} />
               <Route path="/subadmin/submissions" element={<ReviewSubmissions />} />
             </Route>
           </Route>
 
-          {/* Volunteer routes */}
-          <Route element={<ProtectedRoute allowedRoles={['volunteer']} />}>
+          {/* Volunteer routes (Admin, Sub-Admin, and Volunteer can access) */}
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'sub-admin', 'volunteer']} />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/volunteer/dashboard" element={ <RequireRole role="volunteer"> <VolunteerDashboard /> </RequireRole>}/>
+              <Route path="/volunteer/dashboard" element={<VolunteerDashboard />} />
               <Route path="/volunteer/tasks" element={<MyTasks />} />
               <Route path="/volunteer/submit/:taskId" element={<SubmitTask />} />
             </Route>

@@ -23,11 +23,9 @@ export default function ProtectedRoute({ allowedRoles }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    const dashboard = ROLE_DASHBOARDS[user.role] || '/';
+  if (allowedRoles && (!user?.role || !allowedRoles.includes(user.role))) {
+    const dashboard = ROLE_DASHBOARDS[user?.role] || '/';
     return <Navigate to={dashboard} replace />;
   }
-
   return <Outlet />;
 }

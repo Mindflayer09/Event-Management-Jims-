@@ -26,7 +26,8 @@ const schema = z
   });
 
 export default function Register() {
-  const { register: registerUser } = useAuth();
+  
+  const { register: registerUser, user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -42,6 +43,18 @@ export default function Register() {
   const watchRole = watch('role');
 
   useEffect(() => {
+    if (currentUser) {
+      const routes = {
+        admin: '/admin/dashboard',
+        'sub-admin': '/subadmin/dashboard',
+        volunteer: '/volunteer/dashboard',
+      };
+      navigate(routes[currentUser.role] || '/', { replace: true });
+    }
+  }, [currentUser, navigate]);
+
+  // Fetch clubs
+  useEffect(() => {
     const fetchClubs = async () => {
       try {
         const res = await getClubs();
@@ -53,6 +66,7 @@ export default function Register() {
     fetchClubs();
   }, []);
 
+  // Pre-fill club from URL search params
   useEffect(() => {
     const clubParam = searchParams.get('club');
     if (clubParam) setValue('club', clubParam);
