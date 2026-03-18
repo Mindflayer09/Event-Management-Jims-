@@ -174,7 +174,7 @@ export default function Register({ onSuccess, switchToLogin, preSelectedTeamId =
 
           <Select
             label="Join Organization"
-            placeholder="Select your organisation" // ✅ Added placeholder
+            placeholder="Select your organisation"
             disabled={!!preSelectedTeamId}
             options={teams?.map((t) => ({
              value: t._id,
