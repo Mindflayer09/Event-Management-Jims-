@@ -14,9 +14,7 @@ const createAndSendNotification = async (recipient, type, template, relatedEntit
       team: teamId, 
       user: userId, 
     });
-    sendWithRetry(notification).catch(err => 
-      console.error(`[Notification Background Error]: ${err.message}`)
-    );
+    await sendWithRetry(notification);
   } catch (err) {
     console.error(`[Notification Creation Failed]: ${err.message}`);
   }
