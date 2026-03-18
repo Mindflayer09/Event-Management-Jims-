@@ -1,7 +1,39 @@
-const createTransporter = require('../config/email');
+const dns = require('node:dns');
+const nodemailer = require("nodemailer");
 const Notification = require('../models/Notification');
 
+// 🛡️ THE NUCLEAR OPTION: Force IPv4 globally for this process.
+// This is the only way to stop the "connect ENETUNREACH" IPv6 error on Render.
+dns.setDefaultResultOrder("ipv4first");
+
 let transporter = null;
+
+/**
+ * ⚙️ Transporter Configuration
+ */
+const createTransporter = () => {
+  console.log(`📡 Initializing Mailer for ${process.env.SMTP_USER}`);
+
+  return nodemailer.createTransport({
+    // Using 'service: gmail' is better than 'host' as it applies Google-specific tweaks
+    service: 'gmail',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS, // 16-character App Password
+    },
+    // Force IPv4 at the socket level
+    family: 4, 
+    // Optimization for Render's environment
+    pool: true,
+    maxConnections: 3,
+    tls: {
+      rejectUnauthorized: false,
+      minVersion: "TLSv1.2",
+    },
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+  });
+};
 
 const getTransporter = () => {
   if (!transporter) {
@@ -17,19 +49,20 @@ const sendEmail = async (to, subject, html) => {
   try {
     const mail = getTransporter();
     
-    // ✅ GMAIL FIX: Using your authenticated user email as the primary sender 
-    // to prevent Gmail from blocking the message as "spoofed".
-    const senderEmail = process.env.SMTP_USER;
+    // Always use the SMTP_USER as the 'from' address to avoid spam filtering
+    const sender = `"PlannEx Platform" <${process.env.SMTP_USER}>`;
 
-    await mail.sendMail({
-      from: `"PlannEx Platform" <${senderEmail}>`,
+    const info = await mail.sendMail({
+      from: sender,
       to,
       subject,
       html,
     });
+    
+    console.log(`✅ Email delivered: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error(`❌ Email send failed to ${to}:`, error.message);
+    console.error(`❌ SMTP Connection Failed for ${to}:`, error.message);
     throw error;
   }
 };
@@ -38,7 +71,6 @@ const sendEmail = async (to, subject, html) => {
  * 🔄 Queue & Retry Logic
  */
 const sendWithRetry = async (notification, maxRetries = 3) => {
-  // Prevent re-sending if already marked as sent
   if (notification.status === 'sent') return;
 
   try {
@@ -46,14 +78,12 @@ const sendWithRetry = async (notification, maxRetries = 3) => {
     
     notification.status = 'sent';
     notification.sentAt = new Date();
-    notification.error = null; // Clear any previous errors on success
+    notification.error = null;
     await notification.save();
   } catch (error) {
     notification.retryCount += 1;
     notification.error = error.message;
 
-    // ✅ LOGIC FIX: Keep as 'pending' so a worker can try again later, 
-    // unless we've hit the retry ceiling.
     if (notification.retryCount >= maxRetries) {
       notification.status = 'failed';
     } else {
@@ -61,6 +91,7 @@ const sendWithRetry = async (notification, maxRetries = 3) => {
     }
     
     await notification.save();
+    console.log(`🔄 Notification ${notification._id} set to ${notification.status} (Attempt ${notification.retryCount})`);
   }
 };
 
@@ -78,9 +109,6 @@ const emailWrapper = (content) => `
       <p style="font-size: 11px; color: #9ca3af; text-align: center; margin: 0;">
         This is an automated system message from the PlannEx Event Management Platform.
       </p>
-      <p style="font-size: 11px; color: #9ca3af; text-align: center; margin: 4px 0 0 0;">
-        Please do not reply directly to this email.
-      </p>
     </div>
   </div>
 `;
@@ -94,8 +122,7 @@ const templates = {
     body: emailWrapper(`
       <h2 style="color: #111827; margin-bottom: 16px;">Welcome, ${userName}!</h2>
       <p style="font-size: 16px;">Great news! Your account for <strong>${orgName}</strong> has been approved by an administrator.</p>
-      <p style="font-size: 16px; margin-bottom: 30px;">You can now log in to your workspace and start collaborating with your team.</p>
-      <div style="text-align: center;">
+      <div style="margin-top: 30px; text-align: center;">
         <a href="${process.env.CLIENT_URL}/login" style="background-color: #4f46e5; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">Login to Dashboard</a>
       </div>
     `),
@@ -106,25 +133,20 @@ const templates = {
     body: emailWrapper(`
       <h2 style="color: #111827; margin-bottom: 16px;">Hello ${userName},</h2>
       <p style="font-size: 16px;">Your account access for <strong>${orgName}</strong> has been removed by an administrator.</p>
-      <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">If you believe this was done in error, please reach out to your team lead.</p>
     `),
   }),
 
   taskAssigned: (taskTitle, deadline, assignedBy, orgName) => {
-    // ✅ SAFETY: Guard against invalid dates
     const formattedDate = deadline ? new Date(deadline).toLocaleDateString() : 'TBD';
-    
     return {
       subject: `📌 New Task: ${taskTitle} (${orgName})`,
       body: emailWrapper(`
         <h2 style="color: #111827; margin-bottom: 16px;">New Assignment</h2>
-        <p style="font-size: 16px;">You have been assigned a new task in <strong>${orgName}</strong>.</p>
         <div style="background-color: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 25px 0;">
           <p style="margin: 0 0 10px 0;"><strong>Task:</strong> ${taskTitle}</p>
           <p style="margin: 0 0 10px 0;"><strong>Deadline:</strong> <span style="color: #ef4444; font-weight: bold;">${formattedDate}</span></p>
           <p style="margin: 0;"><strong>Assigned by:</strong> ${assignedBy}</p>
         </div>
-        <p style="font-size: 16px;">Please log in to review the details and start your submission.</p>
       `),
     };
   },
@@ -133,9 +155,7 @@ const templates = {
     subject: `Action Required: Task Submission for ${taskTitle}`,
     body: emailWrapper(`
       <h2 style="color: #111827; margin-bottom: 16px;">Review Needed</h2>
-      <p style="font-size: 16px;">A new submission has been received for: <strong>${taskTitle}</strong>.</p>
-      <p style="font-size: 16px;"><strong>Submitted by:</strong> ${submittedBy}</p>
-      <p style="font-size: 16px;">Please log in to the admin dashboard to review the work.</p>
+      <p style="font-size: 16px;">A new submission has been received from <strong>${submittedBy}</strong> for the task: <strong>${taskTitle}</strong>.</p>
     `),
   }),
 
@@ -143,7 +163,7 @@ const templates = {
     subject: `✅ Task Approved - ${taskTitle}`,
     body: emailWrapper(`
       <h2 style="color: #059669; margin-bottom: 16px;">Excellent Work!</h2>
-      <p style="font-size: 16px;">Your submission for <strong>${taskTitle}</strong> has been reviewed and approved.</p>
+      <p style="font-size: 16px;">Your submission for <strong>${taskTitle}</strong> has been approved.</p>
     `),
   }),
 
@@ -151,12 +171,10 @@ const templates = {
     subject: `⚠ Revision Needed: ${taskTitle}`,
     body: emailWrapper(`
       <h2 style="color: #dc2626; margin-bottom: 16px;">Revision Required</h2>
-      <p style="font-size: 16px;">Your submission for <strong>${taskTitle}</strong> was not approved and requires changes.</p>
       <div style="background-color: #fef2f2; padding: 20px; border-radius: 10px; border-left: 5px solid #dc2626; margin: 25px 0;">
         <strong style="color: #991b1b;">Feedback from Admin:</strong><br/>
         <p style="margin-top: 8px; color: #b91c1c;">${reason || 'Please check the dashboard for details.'}</p>
       </div>
-      <p style="font-size: 16px;">Please review the feedback and resubmit your work.</p>
     `),
   }),
 
@@ -164,7 +182,7 @@ const templates = {
     subject: `Phase Update: ${eventTitle}`,
     body: emailWrapper(`
       <h2 style="color: #111827; margin-bottom: 16px;">Event Milestone</h2>
-      <p style="font-size: 16px;">The event <strong>${eventTitle}</strong> has successfully transitioned to the <span style="color: #4f46e5; font-weight: bold;">${newPhase}</span> phase.</p>
+      <p style="font-size: 16px;">The event <strong>${eventTitle}</strong> has moved to the <span style="color: #4f46e5; font-weight: bold;">${newPhase}</span> phase.</p>
     `),
   }),
 
@@ -172,9 +190,14 @@ const templates = {
     subject: `✨ Success! ${eventTitle} is Finalized`,
     body: emailWrapper(`
       <h2 style="color: #4f46e5; margin-bottom: 16px;">Mission Accomplished!</h2>
-      <p style="font-size: 16px;">The event <strong>${eventTitle}</strong> is now officially finalized and the public report has been published.</p>
+      <p style="font-size: 16px;">The event <strong>${eventTitle}</strong> is now officially finalized.</p>
     `),
   }),
 };
 
-module.exports = { sendEmail, sendWithRetry, templates };
+// Cleaned up the exports
+module.exports = { 
+  sendEmail, 
+  sendWithRetry, 
+  templates 
+};
