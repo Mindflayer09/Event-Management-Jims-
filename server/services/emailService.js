@@ -1,46 +1,36 @@
 const nodemailer = require("nodemailer");
 const Notification = require('../models/Notification');
 
-// ✅ We've moved the global DNS fix to server.js, so we keep this file focused 
-// on the transporter and templates.
-
 let transporter = null;
-
-/**
- * ⚙️ Transporter Configuration
- * Hard-coded for IPv4 stability on Render
- */
 const createTransporter = () => {
-  console.log(`📡 SMTP: Connecting to Gmail via IPv4...`);
+  console.log(`📡 SMTP: Forcing IPv4 Lookup for ${process.env.SMTP_USER}...`);
 
   return nodemailer.createTransport({
-    // ✅ SWITCH: Use explicit host instead of 'service: gmail' 
-    // This gives us better control over the 'family' setting.
     host: 'smtp.gmail.com',
     port: 587,
-    secure: false, // Must be false for 587
+    secure: false,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
-    // ✅ FORCE IPv4: 4 = IPv4, 6 = IPv6. This is the critical line.
+    // ✅ FORCE IPv4 AT THE SOCKET LEVEL
     family: 4, 
     
-    // Pooling keeps connections open for faster delivery
+    // ✅ FORCE IPv4 AT THE DNS LEVEL (The "Nuclear" Fix)
+    lookup: (hostname, options, callback) => {
+      dns.lookup(hostname, { family: 4 }, (err, address, family) => {
+        callback(err, address, family);
+      });
+    },
+
     pool: true,
     maxConnections: 3,
-    
     tls: {
       rejectUnauthorized: false,
       minVersion: "TLSv1.2",
     },
-    
     connectionTimeout: 5000,
     greetingTimeout: 5000,
-    
-    // 🔍 DEBUG: Set these to true if it STILL fails to see the raw logs
-    logger: false, 
-    debug: false,
   });
 };
 
