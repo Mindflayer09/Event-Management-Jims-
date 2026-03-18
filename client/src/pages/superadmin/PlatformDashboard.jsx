@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 import { getAllTeams, updateTeamStatus } from '../../api/services/team.service'; 
-import { getAllUsers, approveUser } from '../../api/services/user.service';
-import { getAllEvents } from '../../api/services/event.service'; // ✅ Added Events Import
+// ✅ Added deleteUser to imports
+import { getAllUsers, approveUser, deleteUser } from '../../api/services/user.service';
+import { getAllEvents } from '../../api/services/event.service'; 
 
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -15,10 +16,10 @@ import {
   Users, 
   Calendar, 
   Plus, 
-  Power, 
   UserCheck,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  Trash2 // ✅ Added Trash icon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,15 +28,12 @@ export default function PlatformDashboard() {
   const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  
-  // 🗂️ View State Management
   const [activeTab, setActiveTab] = useState('organizations');
   
-  // Data States
   const [organizations, setOrganizations] = useState([]);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [approvedUsers, setApprovedUsers] = useState([]); 
-  const [platformEvents, setPlatformEvents] = useState([]); // ✅ New state for events
+  const [platformEvents, setPlatformEvents] = useState([]); 
   const [stats, setStats] = useState({
     totalOrgs: 0,
     totalUsers: 0,
@@ -46,7 +44,6 @@ export default function PlatformDashboard() {
   const fetchPlatformData = async () => {
     setLoading(true);
     try {
-      // ✅ Fetch all three datasets in parallel
       const [teamsRes, usersRes, eventsRes] = await Promise.all([
         getAllTeams(),
         getAllUsers(),
@@ -55,7 +52,7 @@ export default function PlatformDashboard() {
 
       const fetchedTeams = Array.isArray(teamsRes) ? teamsRes : (teamsRes?.teams || teamsRes?.data?.teams || []);
       const fetchedUsers = Array.isArray(usersRes) ? usersRes : (usersRes?.users || usersRes?.data?.users || []);
-      const fetchedEvents = Array.isArray(eventsRes) ? eventsRes : (eventsRes?.events || eventsRes?.data?.events || []); // ✅ Unpack events
+      const fetchedEvents = Array.isArray(eventsRes) ? eventsRes : (eventsRes?.events || eventsRes?.data?.events || []);
       
       const pending = fetchedUsers.filter(u => !u.isApproved);
       const approved = fetchedUsers.filter(u => u.isApproved);
@@ -63,13 +60,13 @@ export default function PlatformDashboard() {
       setOrganizations(fetchedTeams);
       setPendingUsers(pending);
       setApprovedUsers(approved);
-      setPlatformEvents(fetchedEvents); // ✅ Store events
+      setPlatformEvents(fetchedEvents); 
 
       setStats({
         totalOrgs: fetchedTeams.length,
         totalUsers: approved.length, 
         pendingCount: pending.length,
-        activeEvents: fetchedEvents.length, // ✅ Real dynamic event count
+        activeEvents: fetchedEvents.length,
       });
 
     } catch (err) {
@@ -93,6 +90,19 @@ export default function PlatformDashboard() {
     }
   };
 
+  // ✅ NEW: Handle User Deletion
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) return;
+    
+    try {
+      await deleteUser(userId);
+      toast.success("User deleted successfully");
+      fetchPlatformData(); 
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete user");
+    }
+  };
+
   const handleToggleStatus = async (teamId, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'archived' : 'active';
     if (!window.confirm(`Are you sure you want to change status to ${newStatus}?`)) return;
@@ -106,45 +116,15 @@ export default function PlatformDashboard() {
     }
   };
 
-  // 📝 Sidebar Navigation Items
   const sidebarCards = [
-    { 
-      id: 'organizations',
-      label: 'Hosted Organizations', 
-      value: stats.totalOrgs, 
-      icon: Building2, 
-      color: 'text-indigo-600',
-      bg: 'bg-indigo-50'
-    },
-    { 
-      id: 'pending',
-      label: 'Pending Approvals', 
-      value: stats.pendingCount, 
-      icon: UserCheck, 
-      color: stats.pendingCount > 0 ? 'text-orange-600' : 'text-gray-500',
-      bg: stats.pendingCount > 0 ? 'bg-orange-50' : 'bg-gray-50'
-    },
-    { 
-      id: 'users',
-      label: 'Platform Users', 
-      value: stats.totalUsers, 
-      icon: Users, 
-      color: 'text-blue-600',
-      bg: 'bg-blue-50'
-    },
-    { 
-      id: 'events',
-      label: 'Platform Events', 
-      value: stats.activeEvents, 
-      icon: Calendar, 
-      color: 'text-purple-600',
-      bg: 'bg-purple-50'
-    },
+    { id: 'organizations', label: 'Hosted Organizations', value: stats.totalOrgs, icon: Building2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { id: 'pending', label: 'Pending Approvals', value: stats.pendingCount, icon: UserCheck, color: stats.pendingCount > 0 ? 'text-orange-600' : 'text-gray-500', bg: stats.pendingCount > 0 ? 'bg-orange-50' : 'bg-gray-50' },
+    { id: 'users', label: 'Platform Users', value: stats.totalUsers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { id: 'events', label: 'Platform Events', value: stats.activeEvents, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 
   if (loading) return <div className="flex justify-center items-center min-h-[60vh]"><Spinner size="lg" /></div>;
 
-  // 🔄 Dynamic Content Renderer
   const renderContent = () => {
     switch(activeTab) {
       case 'organizations':
@@ -173,14 +153,14 @@ export default function PlatformDashboard() {
                       <th className="px-6 py-4 text-right">Control</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y ">
+                  <tbody className="divide-y">
                     {organizations.map((org) => (
                       <tr key={org._id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-medium text-gray-900">{org.name}</td>
                         <td className="px-6 py-4">
                           <Badge variant={org.status === 'active' ? 'success' : 'warning'}>{org.status}</Badge>
                         </td>
-                        <td className="px-6 py-4 text-right ">
+                        <td className="px-6 py-4 text-right">
                           <Button className="cursor-pointer" size="sm" variant="outline" onClick={() => handleToggleStatus(org._id, org.status)}>
                             {org.status === 'active' ? 'Archive' : 'Restore'}
                           </Button>
@@ -225,7 +205,7 @@ export default function PlatformDashboard() {
                         </td>
                         <td className="px-6 py-4 text-gray-600">{u.team?.name || 'N/A'}</td>
                         <td className="px-6 py-4 text-right">
-                          <Button size="sm" onClick={() => handleApproveUser(u._id)} className="bg-green-600 hover:bg-green-700 text-white">
+                          <Button size="sm" onClick={() => handleApproveUser(u._id)} className="bg-green-600 hover:bg-green-700 text-white cursor-pointer">
                             Approve User
                           </Button>
                         </td>
@@ -252,6 +232,7 @@ export default function PlatformDashboard() {
                       <th className="px-6 py-4">Email</th>
                       <th className="px-6 py-4">Organization</th>
                       <th className="px-6 py-4">Role</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -261,6 +242,18 @@ export default function PlatformDashboard() {
                         <td className="px-6 py-4 text-gray-500">{u.email}</td>
                         <td className="px-6 py-4 text-gray-600">{u.team?.name || 'Platform Admin'}</td>
                         <td className="px-6 py-4"><Badge variant="outline" className="uppercase text-[10px]">{u.role}</Badge></td>
+                        <td className="px-6 py-4 text-right">
+                          {/* ✅ Only show delete button for OTHER users, not yourself */}
+                          {u._id !== user?._id && (
+                            <button 
+                              onClick={() => handleDeleteUser(u._id, u.name)}
+                              className="p-2 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                              title="Delete Admin"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -269,7 +262,6 @@ export default function PlatformDashboard() {
           </div>
         );
 
-      // ✅ NEW: The Platform Events Table
       case 'events':
         return (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -331,7 +323,6 @@ export default function PlatformDashboard() {
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)] bg-gray-50/50">
       
-      {/* 👈 LEFT SIDEBAR (The Interactive Cards) */}
       <aside className="w-full md:w-80 p-4 sm:p-6 border-r border-gray-200 bg-white flex flex-col gap-4 ">
         <div className="mb-2 ">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Command Center</h1>
@@ -373,7 +364,6 @@ export default function PlatformDashboard() {
         </div>
       </aside>
 
-      {/* 👉 RIGHT MAIN CONTENT AREA */}
       <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-gray-50">
         {renderContent()}
       </main>
