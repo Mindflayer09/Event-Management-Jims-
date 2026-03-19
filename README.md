@@ -38,8 +38,8 @@ Make sure you have [Node.js](https://nodejs.org/) and [Git](https://git-scm.com/
 
 ### 1. Clone the repository
 \`\`\`bash
-git clone https://github.com/Mindflayer09/Event-Management-Jims-
-cd clubevents
+git clone https://github.com/Mindflayer09/PlannEx-EMS
+cd PlannEx-EMS
 \`\`\`
 
 ### 2. Backend Setup
