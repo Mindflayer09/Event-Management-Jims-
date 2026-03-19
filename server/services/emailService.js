@@ -1,65 +1,32 @@
-const dns = require('node:dns');
-const nodemailer = require("nodemailer");
+// using Twilio SendGrid's v3 Node.js Library
+// https://github.com/sendgrid/sendgrid-nodejs
+const sgMail = require('@sendgrid/mail');
 const Notification = require('../models/Notification');
 
-let transporter = null;
-const createTransporter = () => {
-  console.log(`📡 SMTP: Forcing strict IPv4 lookup...`);
-
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, 
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    
-    //
-    family: 4,
-    lookup: (hostname, options, callback) => {
-      dns.lookup(hostname, { family: 4 }, (err, address, family) => {
-        callback(err, address, family);
-      });
-    },
-
-    pool: true,
-    maxConnections: 3,
-    tls: {
-      rejectUnauthorized: false,
-      minVersion: "TLSv1.2",
-    },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-  });
-};
-
-const getTransporter = () => {
-  if (!transporter) {
-    transporter = createTransporter();
-  }
-  return transporter;
-};
+// Initialize SendGrid with your API Key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// sgMail.setDataResidency('eu'); // Uncomment if you are sending mail using a regional EU subuser
 
 /**
- * 📧 Core Email Dispatcher
+ * 📧 Core Email Dispatcher (SendGrid Integration)
  */
 const sendEmail = async (to, subject, html) => {
-  try {
-    const mail = getTransporter();
-    const sender = `"PlannEx Platform" <${process.env.SMTP_USER}>`;
+  const msg = {
+    to: to, // Recipient
+    from: {
+      name: 'PlannEx Platform',
+      email: process.env.SENDGRID_VERIFIED_SENDER // 🚨 MUST match your verified sender in SendGrid
+    },
+    subject: subject,
+    html: html, // Your professional HTML wrapper
+  };
 
-    const info = await mail.sendMail({
-      from: sender,
-      to,
-      subject,
-      html,
-    });
-    
-    console.log(`✅ Email sent to ${to}: ${info.messageId}`);
+  try {
+    const response = await sgMail.send(msg);
+    console.log(`✅ SendGrid: Email sent to ${to} (Status: ${response[0].statusCode})`);
     return true;
   } catch (error) {
-    console.error(`❌ SMTP Failed: ${error.message}`);
+    console.error(`❌ SendGrid Error for ${to}:`, error.response ? error.response.body : error);
     throw error;
   }
 };
@@ -79,7 +46,8 @@ const sendWithRetry = async (notification, maxRetries = 3) => {
     await notification.save();
   } catch (error) {
     notification.retryCount += 1;
-    notification.error = error.message;
+    // Extract the exact SendGrid error message if available
+    notification.error = error.response ? JSON.stringify(error.response.body) : error.message;
     
     // Status stays 'pending' until maxRetries is hit
     notification.status = notification.retryCount >= maxRetries ? 'failed' : 'pending';

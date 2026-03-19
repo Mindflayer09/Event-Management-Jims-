@@ -14,7 +14,10 @@ const createAndSendNotification = async (recipient, type, template, relatedEntit
       team: teamId, 
       user: userId, 
     });
-    await sendWithRetry(notification);
+    sendWithRetry(notification).catch(err => 
+      console.error(`[Background Email Error]: ${err.message}`)
+    );
+    
   } catch (err) {
     console.error(`[Notification Creation Failed]: ${err.message}`);
   }
@@ -114,6 +117,7 @@ exports.notifyTaskRejected = async (task) => {
 exports.notifyPhaseChanged = async (event) => {
   const users = await User.find({ team: event.team, isApproved: true });
   const template = templates.phaseChanged(event.title, event.phase);
+  
   await Promise.all(users.map(user => 
     createAndSendNotification(
       user.email,
