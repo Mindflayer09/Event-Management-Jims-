@@ -3,7 +3,6 @@ const Team = require('../models/Team');
 const OTP = require('../models/Otp');
 const { generateToken } = require('../utils/tokenUtils');
 const { sendEmail, templates } = require('../services/emailService');
-const Otp = require('../models/Otp');
 
 // ==========================================
 // REGISTRATION STEP 1: Request OTP
@@ -13,18 +12,15 @@ exports.requestRegistrationOTP = async (req, res, next) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
 
-    // 1. Prevent registering an email that already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Email already in use. Please log in.' });
     }
 
-    // 2. Generate and store OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await OTP.deleteMany({ email });
+    await OTP.deleteMany({ email }); 
     await OTP.create({ email, otp: otpCode });
   
-    // 3. Send email
     const template = templates.verificationCode(otpCode);
     await sendEmail(email, template.subject, template.body);
 
@@ -41,55 +37,80 @@ exports.verifyRegistrationAndCreateUser = async (req, res, next) => {
   try {
     const { email, otp, name, password, role, teamId, team, club } = req.body;
 
-    // 1. Verify the OTP
     const validOTP = await OTP.findOne({ email, otp });
-    // console.log("Verifying OTP:", { email, otp , validOTP });
     if (!validOTP) {
       return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
     }
 
-    // OTP is valid! Delete it so it can't be reused
     await OTP.deleteOne({ _id: validOTP._id });
 
-    // 2. Organization Validation
+    // Organization Validation
     const finalTeamId = teamId || team || club || null;
     let teamName = "the platform";
+    
     if (finalTeamId) {
       const foundTeam = await Team.findById(finalTeamId);
       if (!foundTeam) return res.status(404).json({ success: false, message: 'Organization not found' });
       teamName = foundTeam.name;
     }
 
-    // 3. Create the actual User with their Password
+    // 🚀 ROLE LOGIC: Handle 'sub-admin' correctly
     const userRole = role || 'user';
-    let user = await User.create({
+    
+    // Super Admins are auto-approved. 
+    // In a production app, Admins/Sub-Admins usually wait for Super Admin approval.
+    const user = await User.create({
       name,
       email,
-      password, // Password will be hashed by your User model's pre-save hook
+      password, 
       team: finalTeamId, 
       role: userRole,
       isApproved: userRole === 'super_admin' ? true : false 
     });
 
-    user = await User.findById(user._id).populate('team', 'name');
+    // ✅ TWO-WAY LINKING: Update the Team's member array
+    if (finalTeamId) {
+      // Determine Team-level access based on App-level role
+      let accessLevel = 'member';
+      let position = 'Member';
 
-    // 4. Send Response (You can auto-login here by generating a token, or force them to the login screen)
-    const token = generateToken(user);
+      if (userRole === 'admin') {
+        accessLevel = 'admin';
+        position = 'Organization Admin';
+      } else if (userRole === 'sub-admin') {
+        accessLevel = 'member'; // They are members in the Team schema, but have 'sub-admin' App Role
+        position = 'Sub-Admin';
+      }
+
+      await Team.findByIdAndUpdate(finalTeamId, {
+        $push: { 
+          members: { 
+            user: user._id, 
+            accessLevel,
+            position,
+            joinedAt: new Date()
+          } 
+        }
+      });
+    }
+
+    const populatedUser = await User.findById(user._id).populate('team', 'name');
+    const token = generateToken(populatedUser);
 
     res.status(201).json({
       success: true,
       message: userRole === 'super_admin' 
         ? "Registration successful! Welcome to the Command Center."
-        : `Registration successful! You have applied to join ${teamName}. Please wait for an admin to approve your account.`,
+        : `Registration successful! You have applied to join ${teamName}. Please wait for approval.`,
       data: {
         token,
         user: {
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          team: user.team,
-          isApproved: user.isApproved,
+          _id: populatedUser._id,
+          name: populatedUser.name,
+          email: populatedUser.email,
+          role: populatedUser.role,
+          team: populatedUser.team,
+          isApproved: populatedUser.isApproved,
         }
       }
     });
@@ -100,7 +121,7 @@ exports.verifyRegistrationAndCreateUser = async (req, res, next) => {
 };
 
 // ==========================================
-// POST /api/auth/login (RESTORED TO ORIGINAL)
+// LOGIN: Password-based
 // ==========================================
 exports.login = async (req, res, next) => {
   try {
@@ -117,11 +138,16 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
-    const isPlatformAdmin = user.role === 'super_admin' || user.role === 'admin';
-    if (!user.isApproved && !isPlatformAdmin) {
+    // 🚀 UPDATED: isPlatformAdmin now includes 'sub-admin' 
+    // This allows them to bypass the "isApproved" lock if they are internal staff,
+    // or you can keep them locked until a Super Admin approves them.
+    const privilegedRoles = ['super_admin', 'admin', 'sub-admin'];
+    const isStaff = privilegedRoles.includes(user.role);
+
+    if (!user.isApproved && !isStaff) {
       return res.status(403).json({
         success: false,
-        message: 'Your account is pending approval. Please contact your team administrator.',
+        message: 'Your account is pending approval by your team administrator.',
       });
     }
 
@@ -147,7 +173,7 @@ exports.login = async (req, res, next) => {
 };
 
 // ==========================================
-// GET /api/auth/me
+// GET ME: Get Current User Profile
 // ==========================================
 exports.getMe = async (req, res, next) => {
   try {

@@ -1,29 +1,28 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, Wand2 } from 'lucide-react';
 import { generateEventReport } from '../../api/services/report.service';
 
 export default function GenerateReportButton({ eventId, onReportGenerated }) {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleGenerate = async () => {
-    // Prevent accidental clicks
-    if (!window.confirm('Generate a new AI report for this event? This will summarize all completed tasks.')) {
+    if (!window.confirm("Gemini will now analyze all approved task images and descriptions to write the final report. Proceed?")) {
       return;
     }
 
     setIsGenerating(true);
+    const toastId = toast.loading('Gemini is looking at task photos and writing recap...');
+
     try {
       const res = await generateEventReport(eventId);
-      toast.success('Report generated successfully!');
+      toast.success('AI Report Published!', { id: toastId });
       
-      // Pass the new report data back up to the parent component to update the UI
       if (onReportGenerated) {
-        onReportGenerated(res.data);
+        onReportGenerated(res.data?.data || res.data);
       }
     } catch (error) {
-      console.error('Failed to generate report:', error);
-      toast.error(error.response?.data?.message || 'Failed to generate report');
+      toast.error(error.response?.data?.message || 'Failed to generate report', { id: toastId });
     } finally {
       setIsGenerating(false);
     }
@@ -31,23 +30,24 @@ export default function GenerateReportButton({ eventId, onReportGenerated }) {
 
   return (
     <button
+      type="button"
       onClick={handleGenerate}
       disabled={isGenerating}
-      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-all shadow-sm
+      className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-3xl font-black text-white transition-all duration-500 shadow-xl
         ${isGenerating 
-          ? 'bg-indigo-400 cursor-not-allowed' 
-          : 'bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 hover:shadow-md'
+          ? 'bg-slate-800 cursor-not-allowed opacity-80' 
+          : 'bg-linear-to-br from-indigo-600 via-purple-600 to-pink-500 hover:shadow-purple-200 hover:scale-[1.02] active:scale-95'
         }`}
     >
       {isGenerating ? (
         <>
           <Loader2 className="h-5 w-5 animate-spin" />
-          Generating AI Report...
+          <span className="uppercase tracking-widest text-[10px]">AI is Analyzing Images...</span>
         </>
       ) : (
         <>
-          <Sparkles className="h-5 w-5" />
-          Generate Report
+          <Wand2 className="h-5 w-5" />
+          <span className="uppercase tracking-widest text-[10px]">Finalize with AI</span>
         </>
       )}
     </button>

@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
-import { getAllEvents, createEvent, updateEvent, deleteEvent, changeEventPhase, finalizeEvent, generateEventReport } from '../../api/services/event.service';
-import { updateReport } from '../../api/services/report.service';
+import { 
+  getAllEvents, 
+  createEvent, 
+  updateEvent, 
+  deleteEvent, 
+  changeEventPhase, 
+  finalizeEvent 
+} from '../../api/services/event.service';
 import { useAuth } from '../../context/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +19,7 @@ import Input from '../../components/common/Input';
 import Spinner from '../../components/common/Spinner';
 import toast from 'react-hot-toast';
 
-import { Plus, Trash2, Edit, ArrowRight, Lock, Sparkles, FileText } from 'lucide-react';
+import { Plus, Trash2, Edit, ArrowRight, Lock } from 'lucide-react';
 import { PHASE_COLORS, PHASE_LABELS } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 
@@ -26,21 +32,15 @@ const eventSchema = z.object({
 const PHASE_ORDER = ['pre-event', 'during-event', 'post-event'];
 
 export default function TeamEvents() {
-  const { user: currentUser, isSuperAdmin } = useAuth(); // 👈 GET CURRENT USER
+  const { user: currentUser, isSuperAdmin } = useAuth(); 
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Modal States
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [activeReportEvent, setActiveReportEvent] = useState(null);
-  const [activeReportId, setActiveReportId] = useState(null);
-  const [reportText, setReportText] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
 
   // 🛡️ PERMISSION CHECK: Determine if the user has Admin rights
-  // Adjust this logic if your backend returns the specific team accessLevel differently
   const isTeamAdmin = isSuperAdmin || currentUser?.role === 'admin' || currentUser?.teamRole === 'admin';
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
@@ -73,13 +73,6 @@ export default function TeamEvents() {
     setShowModal(true);
   };
 
-  const openReportModal = (event) => {
-    setActiveReportEvent(event);
-    setActiveReportId(null);
-    setReportText('');
-    setShowReportModal(true);
-  };
-
   const onSubmit = async (data) => {
     try {
       if (editing) {
@@ -93,53 +86,6 @@ export default function TeamEvents() {
       fetchEvents();
     } catch (err) {
       toast.error(err.message || 'Failed to save event');
-    }
-  };
-
-  const handleGenerateAI = async () => {
-    setIsGenerating(true);
-    try {
-      const res = await generateEventReport(activeReportEvent._id);
-      const reportId = res.data.report._id;
-      const content = res.data.report.content; 
-      
-      setActiveReportId(reportId);
-
-      let formattedMarkdown = '';
-      if (typeof content === 'object' && content !== null) {
-        formattedMarkdown += `# ${content.headline || 'Event Report'}\n\n`;
-        formattedMarkdown += `${content.leadParagraph || ''}\n\n`;
-        if (content.teamHighlights && content.teamHighlights.length > 0) {
-          formattedMarkdown += `### Team Highlights & Contributions\n`;
-          content.teamHighlights.forEach(item => {
-            formattedMarkdown += `- **${item.role}**: ${item.description}\n`;
-          });
-        }
-      } else {
-        formattedMarkdown = content; 
-      }
-
-      setReportText(formattedMarkdown);
-      toast.success('AI Draft generated successfully!');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to generate AI report');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleSaveReport = async () => {
-    try {
-      if (!activeReportId) {
-        toast.error('No report found. Please generate AI draft first.');
-        return;
-      }
-      await updateReport(activeReportId, { content: reportText, status: 'draft' });
-      toast.success('Report saved successfully');
-      setShowReportModal(false);
-      fetchEvents();
-    } catch (err) {
-      toast.error(err.message || 'Failed to save report');
     }
   };
 
@@ -228,12 +174,8 @@ export default function TeamEvents() {
                         <ArrowRight className="h-3.5 w-3.5 mr-1" /> Next Phase
                       </Button>
                     )}
-                    
-                    {event.phase === 'post-event' && (
-                      <Button size="sm" variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => openReportModal(event)}>
-                        <FileText className="h-3.5 w-3.5 mr-1" /> AI Report
-                      </Button>
-                    )}
+
+                    {/* AI Report button removed from here */}
 
                     {event.phase === 'post-event' && (
                       <Button size="sm" variant="success" onClick={() => handleFinalize(event._id)}>
@@ -256,55 +198,25 @@ export default function TeamEvents() {
 
       {/* 🛡️ MODALS: Only rendered if the user is an admin */}
       {isTeamAdmin && (
-        <>
-          <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Edit Event' : 'Create Event'}>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <Input label="Title" error={errors.title?.message} {...register('title')} />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  rows={4}
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  {...register('description')}
-                />
-                {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
-              </div>
-              <Input label="Budget (optional)" type="number" error={errors.budget?.message} {...register('budget')} />
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-                <Button className="cursor-pointer" type="submit">{editing ? 'Update' : 'Create'}</Button>
-              </div>
-            </form>
-          </Modal>
-
-          <Modal isOpen={showReportModal} onClose={() => setShowReportModal(false)} title="Post-Event Report">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center bg-purple-50 p-3 rounded-lg border border-purple-100">
-                <p className="text-sm text-purple-800">
-                  Generate a public report using event data and completed tasks.
-                </p>
-                <Button size="sm" onClick={handleGenerateAI} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white flex items-center whitespace-nowrap ml-4">
-                  {isGenerating ? <Spinner size="sm" className="mr-2 border-white" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                  {isGenerating ? 'Generating...' : 'Auto-Generate AI Draft'}
-                </Button>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Public Report Content</label>
-                <textarea
-                  rows={12}
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono"
-                  value={reportText}
-                  onChange={(e) => setReportText(e.target.value)}
-                  placeholder="Click 'Auto-Generate' above, or type your report here..."
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                <Button variant="outline" onClick={() => setShowReportModal(false)}>Cancel</Button>
-                <Button onClick={handleSaveReport}>Save Draft</Button>
-              </div>
+        <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Edit Event' : 'Create Event'}>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <Input label="Title" error={errors.title?.message} {...register('title')} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                rows={4}
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                {...register('description')}
+              />
+              {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
             </div>
-          </Modal>
-        </>
+            <Input label="Budget (optional)" type="number" error={errors.budget?.message} {...register('budget')} />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+              <Button className="cursor-pointer" type="submit">{editing ? 'Update' : 'Create'}</Button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

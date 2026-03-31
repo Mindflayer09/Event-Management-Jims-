@@ -1,25 +1,33 @@
 import axios from 'axios';
 
+// Safely handle the base URL to prevent "double slash" 404 errors
+const rawApiUrl = import.meta.env.VITE_API_URL || '/api';
+const cleanApiUrl = rawApiUrl.replace(/\/$/, '');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: cleanApiUrl,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// ✅ Attach JWT + Club ID
+// ==========================================
+// REQUEST INTERCEPTOR
+// ==========================================
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    const selectedClub = localStorage.getItem('selectedClub');
+    
+    // ✅ Updated to use Organization/Team terminology
+    const selectedTeam = localStorage.getItem('selectedTeam'); 
 
-    if (token) {
+    if (token && token !== 'null' && token !== 'undefined') {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Only attach if it exists
-    if (selectedClub && selectedClub !== 'undefined' && selectedClub !== 'null') {
-      config.headers['x-club-id'] = selectedClub;
+    if (selectedTeam && selectedTeam !== 'null' && selectedTeam !== 'undefined') {
+      // ✅ Updated header to match the new architecture
+      config.headers['x-team-id'] = selectedTeam; 
     }
 
     return config;
@@ -27,21 +35,34 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Handle auth errors globally
+// ==========================================
+// RESPONSE INTERCEPTOR
+// ==========================================
 api.interceptors.response.use(
-  (response) => response.data, // IMPORTANT
+  (response) => response.data, 
   (error) => {
+    
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      localStorage.removeItem('selectedClub');
+      
+      // ✅ Ensure the team selection is cleared on logout
+      localStorage.removeItem('selectedTeam'); 
 
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
 
-    return Promise.reject(error.response?.data || { message: 'Network error' });
+    const errorMessage = error.response?.data?.message || error.message || 'Network connection error';
+    
+    const responseData = error.response?.data;
+    const safeData = (typeof responseData === 'object' && responseData !== null) ? responseData : {};
+
+    return Promise.reject({
+      ...safeData,
+      message: errorMessage
+    });
   }
 );
 

@@ -88,26 +88,52 @@ exports.updateRole = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-// 🔴 FIX 2: Added notifyUserDeleted and proper sequencing
 exports.deleteUser = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).populate('team');
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const targetUser = await User.findById(req.params.id).populate('team');
+    if (!targetUser) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const canDelete = isSuperAdmin(req) || (user.team?._id.toString() === req.user.team?.toString());
-    if (!canDelete || user._id.toString() === req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Permission denied' });
+    const requester = req.user;
+
+    // 🏆 Define the Hierarchy Power Levels
+    const rolePower = {
+      'super_admin': 4,
+      'admin': 3,
+      'sub-admin': 2,
+      'user': 1,      // Or 'volunteer'
+      'volunteer': 1
+    };
+
+    const requesterPower = rolePower[requester.role] || 0;
+    const targetPower = rolePower[targetUser.role] || 0;
+
+    // 🛡️ SECURITY CHECK 1: Hierarchy Rule
+    // You can ONLY delete someone if your power is strictly GREATER than theirs
+    if (requesterPower <= targetPower) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Permission denied: A ${requester.role} cannot delete a ${targetUser.role}` 
+      });
     }
 
-    // ✅ Notify BEFORE deletion so we have the user data for the template
+    // 🛡️ SECURITY CHECK 2: Team Isolation
+    // Only Super Admins can delete across different teams
+    const isSameTeam = targetUser.team?._id.toString() === requester.team?.toString();
+    if (requester.role !== 'super_admin' && !isSameTeam) {
+      return res.status(403).json({ success: false, message: 'Access denied: User belongs to another organization' });
+    }
+
+    // 📧 Notification
     try {
-      console.log(` Attempting to notify deleted user: ${user.email}`);
-      await notifyUserDeleted(user);
+      if (typeof notifyUserDeleted === 'function') await notifyUserDeleted(targetUser);
     } catch (err) {
-      console.error('❌ Controller Deletion Email Error:', err.message);
+      console.error('❌ Deletion Email Error:', err.message);
     }
 
     await User.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'User deleted successfully' });
-  } catch (error) { next(error); }
+
+  } catch (error) { 
+    next(error); 
+  }
 };

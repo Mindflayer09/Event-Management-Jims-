@@ -4,6 +4,7 @@ const registerSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   email: Joi.string().email().lowercase().required(),
   password: Joi.string().min(8).max(128).required(),
+  // ✅ Included sub-admin here
   role: Joi.string().valid('super_admin', 'admin', 'sub-admin', 'volunteer', 'user').optional(),
   teamId: Joi.string().hex().length(24).optional().allow('', null),
   team: Joi.string().hex().length(24).optional().allow('', null),
@@ -51,6 +52,7 @@ const updateTaskSchema = Joi.object({
   priority: Joi.string().valid('low', 'medium', 'high', 'critical').optional(),
 });
 
+// ✅ Supports multiple images from the frontend upload
 const submissionSchema = Joi.object({
   notes: Joi.string().allow('').optional(),
   media: Joi.array().items(
@@ -66,8 +68,14 @@ const rejectTaskSchema = Joi.object({
   rejectionReason: Joi.string().trim().min(5).required(),
 });
 
+// 🚀 NEW: Validator for Task Delegation
+const delegateTaskSchema = Joi.object({
+  volunteerId: Joi.string().hex().length(24).required(),
+});
+
+// ✅ UPDATED: Added 'sub-admin' and 'volunteer' to allowed roles
 const updateRoleSchema = Joi.object({
-  role: Joi.string().valid('super_admin', 'admin', 'user').required(),
+  role: Joi.string().valid('super_admin', 'admin', 'sub-admin', 'volunteer', 'user').required(),
 });
 
 module.exports = {
@@ -80,5 +88,6 @@ module.exports = {
   updateTaskSchema,
   submissionSchema,
   rejectTaskSchema,
+  delegateTaskSchema, // ✅ Exported
   updateRoleSchema,
 };

@@ -12,7 +12,8 @@ import {
   deleteTask, 
   submitTask, 
   approveTask, 
-  rejectTask 
+  rejectTask,
+  delegateTask 
 } from '../../api/services/task.service';
 import { getAllEvents } from '../../api/services/event.service';
 import { getAllUsers } from '../../api/services/user.service';
@@ -28,15 +29,14 @@ import {
   Plus, 
   Trash2, 
   Edit, 
-  CheckCircle, 
-  XCircle, 
   Upload, 
   Eye, 
-  Clock,
   ClipboardCheck,
-  AlertCircle
+  Share2,
+  X,
+  Loader2,
+  Clock
 } from 'lucide-react';
-import { formatDate } from '../../utils/helpers';
 
 const taskSchema = z.object({
   title: z.string().min(3, 'Title is required'),
@@ -45,11 +45,18 @@ const taskSchema = z.object({
   assignedTo: z.string().min(1, 'Please select a team member'),
   deadline: z.string().min(1, 'Deadline is required'),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
+  phase: z.string().min(1, 'Phase is required'), 
 });
+
+// Used to compare event phase vs task phase
+const PHASE_ORDER = ['pre-event', 'during-event', 'post-event'];
 
 export default function TeamTasks() {
   const { user: currentUser, isSuperAdmin } = useAuth();
-  const isTeamAdmin = isSuperAdmin || currentUser?.role === 'admin' || currentUser?.teamRole === 'admin';
+  
+  const isSubAdmin = currentUser?.role === 'sub-admin';
+  const isAdmin = isSuperAdmin || currentUser?.role === 'admin';
+  const isManagement = isAdmin || isSubAdmin;
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,16 +68,20 @@ export default function TeamTasks() {
   const [showManageModal, setShowManageModal] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showDelegateModal, setShowDelegateModal] = useState(false);
   
   const [activeTask, setActiveTask] = useState(null);
   const [submissionNotes, setSubmissionNotes] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState([]); 
   const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedVolunteer, setSelectedVolunteer] = useState('');
+  
+  const [isUploading, setIsUploading] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(taskSchema),
   });
 
-  // ✅ NEW: Populate form when editing
   useEffect(() => {
     if (activeTask && showManageModal) {
       reset({
@@ -80,6 +91,7 @@ export default function TeamTasks() {
         assignedTo: activeTask.assignedTo?._id || activeTask.assignedTo,
         deadline: activeTask.deadline ? activeTask.deadline.split('T')[0] : '',
         priority: activeTask.priority,
+        phase: activeTask.phase || '', 
       });
     }
   }, [activeTask, showManageModal, reset]);
@@ -88,25 +100,23 @@ export default function TeamTasks() {
     setLoading(true);
     try {
       const taskRes = await getAllTasks({ status: filter !== 'all' ? filter : undefined, limit: 100 });
-      
-      // ✅ FIX: Robust Unpacking
       const fetchedTasks = Array.isArray(taskRes) ? taskRes : (taskRes?.tasks || taskRes?.data?.tasks || []);
       setTasks(fetchedTasks);
 
-      if (isTeamAdmin) {
+      if (isManagement) {
         const [eventsRes, usersRes] = await Promise.all([
           getAllEvents({ limit: 50 }),
           getAllUsers({ isApproved: 'true', limit: 100 })
         ]);
         
-        const fetchedEvents = Array.isArray(eventsRes) ? eventsRes : (eventsRes?.events || eventsRes?.data?.events || []);
-        const fetchedUsers = Array.isArray(usersRes) ? usersRes : (usersRes?.users || usersRes?.data?.users || []);
-
-        setTeamEvents(fetchedEvents.filter(e => !e.isFinalized));
-        setTeamMembers(fetchedUsers);
+        const extractedEvents = Array.isArray(eventsRes) ? eventsRes : (eventsRes?.data?.events || eventsRes?.events || []);
+        setTeamEvents(extractedEvents.filter(e => !e.isFinalized));
+        
+        const extractedUsers = Array.isArray(usersRes) ? usersRes : (usersRes?.data?.users || usersRes?.users || []);
+        setTeamMembers(extractedUsers);
       }
     } catch (err) {
-      toast.error('Failed to load tasks data');
+      toast.error('Failed to load tasks');
     } finally {
       setLoading(false);
     }
@@ -114,38 +124,7 @@ export default function TeamTasks() {
 
   useEffect(() => { fetchData(); }, [filter]);
 
-  const openCreate = () => {
-    setActiveTask(null);
-    reset({ title: '', description: '', event: '', assignedTo: '', deadline: '', priority: 'medium' });
-    setShowManageModal(true);
-  };
-
-  const onManageSubmit = async (data) => {
-    try {
-      if (activeTask) {
-        await updateTask(activeTask._id, data);
-        toast.success('Task updated');
-      } else {
-        await createTask(data);
-        toast.success('Task assigned successfully');
-      }
-      setShowManageModal(false);
-      fetchData();
-    } catch (err) {
-      toast.error(err.message || 'Failed to save task');
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this task?')) return;
-    try {
-      await deleteTask(id);
-      toast.success('Task deleted');
-      fetchData();
-    } catch (err) {
-      toast.error('Failed to delete task');
-    }
-  };
+  // --- ACTIONS ---
 
   const handleApprove = async () => {
     try {
@@ -170,257 +149,344 @@ export default function TeamTasks() {
     }
   };
 
-  const onVolunteerSubmit = async (e) => {
-    e.preventDefault();
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this task?')) return;
     try {
-      await submitTask(activeTask._id, {
-        notes: submissionNotes,
-        media: [] 
-      });
-      toast.success('Work submitted successfully!');
-      setShowSubmitModal(false);
+      await deleteTask(id);
+      toast.success('Task deleted');
       fetchData();
     } catch (err) {
-      toast.error(err.message || 'Failed to submit task');
+      toast.error('Failed to delete task');
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'bg-amber-100 text-amber-700 border border-amber-200',
-      submitted: 'bg-blue-100 text-blue-700 border border-blue-200',
-      approved: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-      rejected: 'bg-rose-100 text-rose-700 border border-rose-200',
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    setSelectedFiles((prev) => [...prev, ...files]);
+  };
+
+  const removeFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const onVolunteerSubmit = async (e) => {
+    e.preventDefault();
+    if (selectedFiles.length === 0) return toast.error("Please attach proof images");
+
+    setIsUploading(true);
+    const toastId = toast.loading('Uploading images and submitting work...');
+
+    try {
+      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+      if (!cloudName || !uploadPreset) {
+        throw new Error("Missing Cloudinary config in .env file!");
+      }
+
+      const uploadedMedia = [];
+
+      for (const file of selectedFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', uploadPreset); 
+        
+        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        const uploadData = await uploadRes.json();
+
+        if (uploadData.secure_url) {
+          uploadedMedia.push({
+            url: uploadData.secure_url, 
+            fileType: file.type,
+            publicId: uploadData.public_id
+          });
+        } else {
+          throw new Error(uploadData.error?.message || 'Failed to upload image to cloud');
+        }
+      }
+
+      await submitTask(activeTask._id, { notes: submissionNotes, media: uploadedMedia });
+      
+      toast.success('Work submitted successfully!', { id: toastId });
+      setShowSubmitModal(false);
+      setSelectedFiles([]);
+      setSubmissionNotes('');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message || 'Submission failed', { id: toastId });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDelegateSubmit = async () => {
+    if (!selectedVolunteer) return toast.error("Select a subordinate");
+    try {
+      await delegateTask(activeTask._id, { volunteerId: selectedVolunteer });
+      toast.success("Task reassigned");
+      setShowDelegateModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message || "Delegation failed");
+    }
+  };
+
+  const onManageSubmit = async (data) => {
+    try {
+      if (activeTask) {
+        await updateTask(activeTask._id, data);
+        toast.success('Task updated');
+      } else {
+        await createTask(data);
+        toast.success('Task assigned');
+      }
+      setShowManageModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error('Save failed');
+    }
+  };
+
+  const getStatusStyle = (status) => {
+    const styles = {
+      pending: 'bg-amber-50 text-amber-700 border-amber-100',
+      submitted: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+      approved: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      rejected: 'bg-rose-50 text-rose-700 border-rose-100',
     };
-    return colors[status] || 'bg-gray-100 text-gray-700';
+    return styles[status] || 'bg-gray-50 text-gray-700';
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 rounded-lg">
-            <ClipboardCheck className="h-6 w-6 text-indigo-600" />
+    <div className="max-w-7xl mx-auto pb-12 px-4">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg">
+            <ClipboardCheck className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-              {isTeamAdmin ? 'Team Management Tasks' : 'My Assignments'}
+            <h1 className="text-2xl font-black text-gray-900">
+              {isAdmin ? 'Admin Control' : isSubAdmin ? 'Sub-Admin Workspace' : 'My Assignments'}
             </h1>
-            <p className="text-sm text-gray-500">Track and manage project deliverables</p>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mt-1">Workflow Tracking</p>
           </div>
         </div>
         
         <div className="flex items-center gap-3">
-          <select 
-            className="rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm bg-gray-50 px-4 py-2 cursor-pointer outline-none"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="all">All Tasks</option>
+          <select className="rounded-2xl border-gray-100 shadow-sm text-sm bg-gray-50 px-4 py-2 outline-none" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">Filter: All</option>
             <option value="pending">🟡 Pending</option>
-            <option value="submitted">🔵 Awaiting Review</option>
-            <option value="approved">🟢 Approved</option>
-            <option value="rejected">🔴 Rejected</option>
+            <option value="submitted">🔵 Reviewing</option>
+            <option value="approved">🟢 Completed</option>
+            <option value="rejected">🔴 Redo</option>
           </select>
-
-          {isTeamAdmin && (
-            <Button onClick={openCreate} className="shadow-md hover:shadow-lg transition-shadow">
-              <Plus className="h-4 w-4 mr-2" /> Assign Task
+          {isAdmin && (
+            <Button onClick={() => { setActiveTask(null); setShowManageModal(true); }} className="rounded-2xl">
+              <Plus className="h-4 w-4 mr-2" /> Assign New
             </Button>
           )}
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20"><Spinner size="lg" /></div>
-      ) : tasks.length === 0 ? (
-        <Card className="text-center py-16 border-dashed border-2 bg-gray-50/50">
-          <div className="h-16 w-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="h-8 w-8" />
-          </div>
-          <p className="text-gray-600 font-medium text-lg">No tasks found</p>
-          <p className="text-gray-400 text-sm mt-1">There are currently no tasks matching this filter.</p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tasks.map((task) => (
-            <Card key={task._id} className="flex flex-col group hover:border-indigo-200 transition-all duration-300 hover:shadow-md">
-              <div className="flex justify-between items-start mb-4">
-                <Badge className={getStatusColor(task.status)}>{task.status.toUpperCase()}</Badge>
-                <Badge className={
-                  task.priority === 'critical' ? 'bg-rose-50 text-rose-700 border border-rose-100' : 
-                  task.priority === 'high' ? 'bg-orange-50 text-orange-700 border border-orange-100' : 'bg-slate-100 text-slate-700'
-                }>
-                  {task.priority}
-                </Badge>
-              </div>
-              
-              <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">{task.title}</h3>
-              <p className="text-sm text-gray-500 mb-6 line-clamp-2 leading-relaxed">{task.description}</p>
-              
-              <div className="mt-auto space-y-2.5 text-xs bg-gray-50 p-3 rounded-xl mb-6">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Event</span>
-                  <span className="font-semibold text-gray-700">{task.event?.title || 'General'}</span>
-                </div>
-                {isTeamAdmin && (
-                  <div className="flex justify-between border-t border-gray-100 pt-2">
-                    <span className="text-gray-400">Owner</span>
-                    <span className="font-semibold text-gray-700">{task.assignedTo?.name || 'Unassigned'}</span>
-                  </div>
-                )}
-                <div className="flex justify-between border-t border-gray-100 pt-2">
-                  <span className="text-gray-400">Deadline</span>
-                  <span className="flex items-center font-bold text-indigo-600 italic">
-                    <Clock className="h-3 w-3 mr-1"/> {formatDate(task.deadline)}
-                  </span>
-                </div>
-              </div>
+      {loading ? <Spinner size="lg" className="mx-auto mt-20" /> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {tasks.map((task) => {
+            const isAssignedToMe = task.assignedTo?._id === currentUser?._id;
+            const canDelegate = isSubAdmin && isAssignedToMe && task.status === 'pending';
 
-              <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
-                {isTeamAdmin ? (
-                  <>
-                    {task.status === 'submitted' && (
-                      <Button size="sm" variant="success" className="w-full flex justify-center py-2.5" onClick={() => { setActiveTask(task); setRejectionReason(''); setShowReviewModal(true); }}>
-                        <Eye className="h-4 w-4 mr-2" /> Review Work
-                      </Button>
-                    )}
-                    {task.status !== 'approved' && task.status !== 'submitted' && (
-                      <Button size="sm" variant="outline" className="flex-1" onClick={() => { setActiveTask(task); setShowManageModal(true); }}>
-                        <Edit className="h-4 w-4 mr-2" /> Edit
-                      </Button>
-                    )}
-                    <Button size="sm" variant="danger" className={task.status === 'approved' ? 'w-full' : ''} onClick={() => handleDelete(task._id)}>
-                      <Trash2 className="h-4 w-4" />
+            const eventPhaseIdx = PHASE_ORDER.indexOf(task.event?.phase || 'pre-event');
+            const taskPhaseIdx = PHASE_ORDER.indexOf(task.phase || 'pre-event');
+            const isPhaseReady = eventPhaseIdx >= taskPhaseIdx;
+
+            return (
+              <Card key={task._id} className="flex flex-col group hover:shadow-xl transition-all duration-500 rounded-3xl border-gray-100">
+                <div className="flex justify-between items-center mb-5">
+                  <Badge className={`${getStatusStyle(task.status)} px-3 py-1 text-[10px] font-bold rounded-lg uppercase border`}>{task.status}</Badge>
+                  <span className="text-[10px] font-bold text-gray-300 uppercase">{task.priority}</span>
+                </div>
+                
+                <h3 className="text-lg font-extrabold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">{task.title}</h3>
+                <p className="text-sm text-gray-500 mb-6 line-clamp-2">{task.description}</p>
+                
+                <div className="mt-auto space-y-2.5 text-[11px] bg-gray-50 p-4 rounded-2xl mb-6">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 font-medium">Assignee</span>
+                    <span className="font-bold text-gray-700">{task.assignedTo?.name}</span>
+                  </div>
+                  {task.delegatedBy && (
+                    <div className="flex justify-between border-t border-gray-200/50 pt-2 italic">
+                      <span className="text-gray-400">Via Sub-Admin</span>
+                      <span className="text-indigo-600 font-bold">{task.delegatedBy.name}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-gray-200/50 pt-2">
+                    <span className="text-gray-400 font-medium">Execution Phase</span>
+                    <span className={`font-bold uppercase ${isPhaseReady ? 'text-emerald-600' : 'text-amber-500'}`}>
+                      {task.phase?.replace('-', ' ')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-50">
+                  
+                  {/* 🚀 FIX: Only full Admins can review and approve submissions now */}
+                  {isAdmin && task.status === 'submitted' && (
+                    <Button size="sm" variant="success" className="w-full rounded-xl py-3 shadow-sm" onClick={() => { setActiveTask(task); setRejectionReason(''); setShowReviewModal(true); }}>
+                      <Eye className="h-4 w-4 mr-2" /> Review Submission
                     </Button>
-                  </>
-                ) : (
-                  <>
-                    {(task.status === 'pending' || task.status === 'rejected') && (
-                      <Button size="sm" className="w-full flex justify-center py-2.5" onClick={() => { setActiveTask(task); setSubmissionNotes(''); setShowSubmitModal(true); }}>
-                        <Upload className="h-4 w-4 mr-2" /> {task.status === 'rejected' ? 'Fix & Resubmit' : 'Submit My Work'}
+                  )}
+                  
+                  {isAssignedToMe && (task.status === 'pending' || task.status === 'rejected') && (
+                    isPhaseReady ? (
+                      <Button size="sm" className="flex-1 rounded-xl py-3" onClick={() => { setActiveTask(task); setSubmissionNotes(''); setShowSubmitModal(true); }}>
+                        <Upload className="h-4 w-4 mr-2" /> Submit Proof
                       </Button>
-                    )}
-                    {task.status === 'rejected' && (
-                      <div className="w-full p-3 bg-rose-50 text-rose-700 text-xs rounded-xl mt-2 border border-rose-100 flex gap-2">
-                        <AlertCircle className="h-4 w-4 shrink-0" />
-                        <div><strong>Feedback:</strong> {task.rejectionReason}</div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </Card>
-          ))}
+                    ) : (
+                      <Button size="sm" variant="outline" className="flex-1 rounded-xl py-3 opacity-60 cursor-not-allowed bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-500" title="This task cannot be submitted until the event reaches this phase.">
+                        <Clock className="h-4 w-4 mr-2" /> Locked
+                      </Button>
+                    )
+                  )}
+
+                  {canDelegate && (
+                    <Button size="sm" variant="outline" className="flex-1 rounded-xl py-3" onClick={() => { setActiveTask(task); setShowDelegateModal(true); }}>
+                      <Share2 className="h-4 w-4 mr-2" /> Delegate
+                    </Button>
+                  )}
+                  
+                  {isAdmin && (
+                    <div className="flex gap-2 ml-auto">
+                      <button onClick={() => { setActiveTask(task); setShowManageModal(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(task._id)} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )
+          })}
         </div>
       )}
 
-      {/* MODAL 1: ADMIN CREATE/EDIT */}
-      <Modal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title={activeTask ? 'Modify Assignment' : 'New Task Assignment'}>
-        <form onSubmit={handleSubmit(onManageSubmit)} className="space-y-5 p-2">
-          <Input label="Task Title" placeholder="e.g., Design Event Posters" error={errors.title?.message} {...register('title')} />
-          
+      {/* MODAL 1: ADMIN MANAGE */}
+      <Modal isOpen={showManageModal} onClose={() => setShowManageModal(false)} title={activeTask ? 'Modify Assignment' : 'New Assignment'}>
+        <form onSubmit={handleSubmit(onManageSubmit)} className="space-y-4">
+          <Input label="Task Title" placeholder="What needs to be done?" error={errors.title?.message} {...register('title')} />
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description & Requirements</label>
-            <textarea rows={4} className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm border p-3 outline-none" placeholder="Provide detailed instructions..." {...register('description')} />
-            {errors.description && <p className="text-rose-500 text-xs mt-1">{errors.description.message}</p>}
+            <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
+            <textarea rows={3} className="block w-full rounded-xl border border-gray-200 p-3 text-sm" {...register('description')} />
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Event Context</label>
-              <select className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm border p-3 bg-white outline-none" {...register('event')}>
-                <option value="">Select Event...</option>
-                {teamEvents.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
-              </select>
-              {errors.event && <p className="text-rose-500 text-xs mt-1">{errors.event.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Assignee</label>
-              <select className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm border p-3 bg-white outline-none" {...register('assignedTo')}>
-                <option value="">Select Member...</option>
-                {teamMembers.map(m => <option key={m._id} value={m._id}>{m.name}</option>)}
-              </select>
-              {errors.assignedTo && <p className="text-rose-500 text-xs mt-1">{errors.assignedTo.message}</p>}
-            </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <select className="rounded-xl border border-gray-200 p-3 text-sm outline-none bg-white" {...register('event')}>
+              <option value="">Select Event</option>
+              {teamEvents.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
+            </select>
+            
+            <select className="rounded-xl border border-gray-200 p-3 text-sm outline-none bg-white" {...register('assignedTo')}>
+              <option value="">Select Assignee</option>
+              {teamMembers
+                .filter(m => ['sub-admin', 'volunteer', 'user'].includes(m.role))
+                .map(m => (
+                  <option key={m._id} value={m._id}>
+                    {m.name} ({m.role.replace('-', ' ').toUpperCase()})
+                  </option>
+              ))}
+            </select>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Deadline" type="date" error={errors.deadline?.message} {...register('deadline')} />
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Priority Level</label>
-              <select className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm border p-3 bg-white outline-none" {...register('priority')}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Input type="date" label="Deadline" {...register('deadline')} />
+            <select className="rounded-xl border border-gray-200 p-3 text-sm mt-6 outline-none bg-white" {...register('priority')}>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
           </div>
-
-          <div className="flex justify-end gap-3 mt-8">
+          <select className="w-full rounded-xl border border-gray-200 p-3 text-sm outline-none bg-white" {...register('phase')}>
+            <option value="pre-event">Pre-Event</option>
+            <option value="during-event">During Event</option>
+            <option value="post-event">Post-Event</option>
+          </select>
+          <div className="flex justify-end gap-3 pt-4">
             <Button variant="outline" onClick={() => setShowManageModal(false)}>Cancel</Button>
-            <Button type="submit">{activeTask ? 'Save Changes' : 'Confirm Assignment'}</Button>
+            <Button type="submit">Confirm Task</Button>
           </div>
         </form>
       </Modal>
 
       {/* MODAL 2: VOLUNTEER SUBMISSION */}
-      <Modal isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Submit Completed Work">
-        <form onSubmit={onVolunteerSubmit} className="space-y-5">
-          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex items-center gap-3">
-            <ClipboardCheck className="h-5 w-5 text-indigo-600" />
-            <span className="text-sm font-bold text-indigo-900">{activeTask?.title}</span>
+      <Modal isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Upload Completed Work">
+        <form onSubmit={onVolunteerSubmit} className="space-y-6">
+          <textarea rows={3} className="block w-full rounded-2xl border border-gray-100 p-4 text-sm bg-gray-50/50" placeholder="Work notes..." value={submissionNotes} onChange={(e) => setSubmissionNotes(e.target.value)} required />
+          
+          <div className="border-2 border-dashed border-gray-200 rounded-3xl p-8 text-center relative hover:bg-indigo-50/30 transition-all">
+            <input type="file" multiple accept="image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isUploading} />
+            <Upload className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-xs font-bold text-gray-400">Click to upload multiple images</p>
           </div>
           
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Submission Notes</label>
-            <textarea 
-              rows={5} 
-              className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm border p-3 outline-none" 
-              placeholder="List what you've accomplished or include links to cloud assets (Drive, Figma, etc)..."
-              value={submissionNotes}
-              onChange={(e) => setSubmissionNotes(e.target.value)}
-              required
-            />
+          <div className="flex flex-wrap gap-3 mt-4">
+            {selectedFiles.map((file, idx) => (
+              <div key={idx} className="relative w-20 h-20 bg-white rounded-xl overflow-hidden border shadow-sm">
+                <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
+                <button type="button" onClick={() => removeFile(idx)} className="absolute top-0 right-0 bg-rose-500 text-white p-0.5 rounded-bl" disabled={isUploading}>
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
-            <Button variant="outline" onClick={() => setShowSubmitModal(false)}>Cancel</Button>
-            <Button type="submit">Send for Approval</Button>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setShowSubmitModal(false)} disabled={isUploading}>Cancel</Button>
+            <Button type="submit" disabled={selectedFiles.length === 0 || isUploading}>
+              {isUploading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading...</> : "Submit Proof"}
+            </Button>
           </div>
         </form>
       </Modal>
 
-      {/* MODAL 3: ADMIN REVIEW */}
-      <Modal isOpen={showReviewModal} onClose={() => setShowReviewModal(false)} title="Task Quality Review">
+      {/* MODAL 3: MANAGEMENT REVIEW */}
+      <Modal isOpen={showReviewModal} onClose={() => setShowReviewModal(false)} title="Quality Review">
         <div className="space-y-6">
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-            <div className="flex items-center gap-2 mb-3 text-indigo-600">
-              <Plus className="h-4 w-4 rotate-45" /> 
-              <span className="text-xs font-bold uppercase tracking-wider">{activeTask?.assignedTo?.name}'s Update</span>
+            <div className="text-xs font-bold text-indigo-600 uppercase mb-2">Volunteer's Notes</div>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{activeTask?.submissions?.[activeTask.submissions.length - 1]?.notes}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {activeTask?.submissions?.[activeTask.submissions.length - 1]?.media?.map((m, idx) => (
+                <a key={idx} href={m.url} target="_blank" rel="noreferrer" className="w-24 h-24 rounded-xl overflow-hidden border-2 border-white shadow-sm block hover:scale-105 transition-transform">
+                  <img src={m.url} className="w-full h-full object-cover" />
+                </a>
+              ))}
             </div>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {activeTask?.submissions?.[activeTask.submissions.length - 1]?.notes || 'No specific notes provided.'}
-            </p>
           </div>
-
           <div>
-            <label className="block text-sm font-semibold mb-1.5 text-rose-600">Rejection Feedback (Internal Only)</label>
-            <textarea 
-              rows={3} 
-              className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-rose-500 focus:ring-rose-500 text-sm border p-3 outline-none" 
-              placeholder="Tell the volunteer exactly what needs to be fixed if rejecting..."
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-            />
+            <label className="block text-xs font-bold text-rose-600 uppercase mb-2">Rejection Feedback</label>
+            <textarea rows={2} className="block w-full rounded-xl border border-gray-100 p-3 text-sm bg-gray-50/50" placeholder="Why is this rejected?" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
           </div>
+          <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+            <Button variant="outline" className="mr-auto" onClick={() => setShowReviewModal(false)}>Close</Button>
+            <Button variant="danger" onClick={handleReject}>Reject</Button>
+            <Button variant="success" onClick={handleApprove}>Approve</Button>
+          </div>
+        </div>
+      </Modal>
 
-          <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
-            <Button variant="outline" className="sm:mr-auto" onClick={() => setShowReviewModal(false)}>Close</Button>
-            <Button variant="danger" className="px-6" onClick={handleReject}><XCircle className="h-4 w-4 mr-2"/> Return for Fixes</Button>
-            <Button variant="success" className="px-6 shadow-sm" onClick={handleApprove}><CheckCircle className="h-4 w-4 mr-2"/> Final Approval</Button>
+      {/* MODAL 4: TASK DELEGATION */}
+      <Modal isOpen={showDelegateModal} onClose={() => setShowDelegateModal(false)} title="Delegate Assignment">
+        <div className="space-y-6">
+          <select className="block w-full rounded-2xl border border-gray-100 p-4 text-sm bg-gray-50/50 outline-none" value={selectedVolunteer} onChange={(e) => setSelectedVolunteer(e.target.value)}>
+            <option value="">Choose a member...</option>
+            {teamMembers.filter(m => ['user', 'volunteer'].includes(m.role)).map(v => <option key={v._id} value={v._id}>{v.name}</option>)}
+          </select>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setShowDelegateModal(false)}>Cancel</Button>
+            <Button onClick={handleDelegateSubmit} variant="success">Confirm Delegation</Button>
           </div>
         </div>
       </Modal>

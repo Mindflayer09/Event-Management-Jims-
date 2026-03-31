@@ -8,6 +8,15 @@ import toast from 'react-hot-toast';
 import { UserCheck, UserX } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
+// 🏆 Define Hierarchy Power Levels (Must match backend strings exactly)
+const ROLE_POWER = {
+  'super_admin': 4,
+  'admin': 3,
+  'sub-admin': 2,
+  'user': 1,
+  'volunteer': 1 // Including both in case your DB uses either
+};
+
 export default function ManageUsers() {
   const [users, setUsers] = useState([]);
   const { user: currentUser } = useAuth();
@@ -22,8 +31,6 @@ export default function ManageUsers() {
       if (filter === 'approved') params.isApproved = 'true';
 
       const res = await getAllUsers({ ...params, limit: 100 });
-      
-      // ✅ THE FIX: Robust data unpacking
       const fetchedUsers = Array.isArray(res) ? res : (res?.users || res?.data?.users || []);
       setUsers(fetchedUsers);
       
@@ -38,21 +45,16 @@ export default function ManageUsers() {
     fetchUsers();
   }, [filter]);
 
-  // 🚀 Handles the Team context and Job Title for the new backend
   const handleApprove = async (userToApprove) => {
-    // Optional: Ask the admin what title to give this person upon approval
     const position = window.prompt(
-      `Enter a job title for ${userToApprove.name} (e.g., Volunteer, Coordinator):`, 
+      `Enter a job title for ${userToApprove.name}:`, 
       'Volunteer'
     );
-    
-    if (position === null) return; // User cancelled the prompt
+    if (position === null) return;
 
     try {
-      // If your user.service.js expects just the user ID (which we set up earlier):
       await approveUser(userToApprove._id);
-      
-      toast.success(`${userToApprove.name} approved as ${position}!`);
+      toast.success(`${userToApprove.name} approved!`);
       fetchUsers();
     } catch (err) {
       toast.error(err.message || 'Failed to approve');
@@ -60,7 +62,7 @@ export default function ManageUsers() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this user?')) return;
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
       await deleteUser(id);
       toast.success('User deleted');
@@ -70,21 +72,10 @@ export default function ManageUsers() {
     }
   };
 
-  const handleRoleChange = async (id, role) => {
-    try {
-      await updateUserRole(id, { role });
-      toast.success('Role updated');
-      fetchUsers();
-    } catch (err) {
-      toast.error(err.message || 'Failed to update role');
-    }
-  };
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Manage Members</h1>
 
-      {/* Filter Tabs */}
       <div className="flex gap-2 mb-6">
         {['all', 'pending', 'approved'].map((f) => (
           <button
@@ -126,53 +117,43 @@ export default function ManageUsers() {
             <tbody className="divide-y divide-gray-100">
               {users.map((user) => {
                 const isSelf = user._id === currentUser?._id;
+                
+                // 🚀 HIERARCHY LOGIC
+                const currentUserPower = ROLE_POWER[currentUser?.role] || 0;
+                const targetUserPower = ROLE_POWER[user.role] || 0;
+                
+                // You can only take action if you are strictly higher in the food chain
+                const canManage = currentUserPower > targetUserPower;
 
                 return (
                   <tr key={user._id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {user.name}
-                      {isSelf && (
-                        <span className="ml-2 text-xs text-indigo-600">(You)</span>
-                      )}
+                      {isSelf && <span className="ml-2 text-xs text-indigo-600">(You)</span>}
                     </td>
 
                     <td className="px-4 py-3 text-gray-500">{user.email}</td>
+                    <td className="px-4 py-3 text-gray-500">{user.team?.name || '-'}</td>
 
-                    <td className="px-4 py-3 text-gray-500">
-                      {user.team?.name || '-'}
-                    </td>
-
-                    {/* App Role Badge */}
                     <td className="px-4 py-3">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                          user.role === "super_admin"
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                        user.role === "super_admin" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-700"
+                      }`}>
                         {user.role}
                       </span>
                     </td>
 
-                    {/* Status Badge */}
                     <td className="px-4 py-3">
-                      <Badge
-                        className={
-                          user.isApproved
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }
-                      >
+                      <Badge className={user.isApproved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
                         {user.isApproved ? 'Approved' : 'Pending'}
                       </Badge>
                     </td>
 
-                    {/* Actions */}
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         
-                        {!user.isApproved && !isSelf && (
+                        {/* ✅ Only show Approve if target is lower power AND pending */}
+                        {canManage && !user.isApproved && (
                           <Button
                             size="sm"
                             variant="success"
@@ -183,7 +164,8 @@ export default function ManageUsers() {
                           </Button>
                         )}
 
-                        {!isSelf && (
+                        {/* ✅ Only show Delete if target is lower power (Garv won't see this for Suraj) */}
+                        {canManage && !isSelf && (
                           <Button
                             size="sm"
                             variant="danger"

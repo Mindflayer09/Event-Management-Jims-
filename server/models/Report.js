@@ -12,14 +12,17 @@ const reportSchema = new mongoose.Schema(
       ref: 'Team',
       required: true,
     },
-    content: {
-     headline: String,
-     leadParagraph: String,
-     teamHighlights: [{
-     role: String,
-     description: String
-     }],
+   content: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     },
+    reportImage: {
+      type: String,
+      default: ''
+    },
+    galleryImages: [{
+      type: String
+    }],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -41,6 +44,6 @@ const reportSchema = new mongoose.Schema(
 // Index for faster public report queries
 reportSchema.index({ isPublic: 1 });
 reportSchema.index({ event: 1 });
-reportSchema.index({ club: 1 });
+reportSchema.index({ team: 1 }); 
 
 module.exports = mongoose.model('Report', reportSchema);

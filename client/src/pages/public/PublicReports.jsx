@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getPublicEvents } from '../../api/services/event.service';
-import { Calendar, MapPin, Image } from 'lucide-react';
+import { Calendar, MapPin, Image as ImageIcon } from 'lucide-react';
 import Spinner from '../../components/common/Spinner';
 import Card from '../../components/common/Card';
 import Modal from '../../components/common/Modal';
 import { formatDate } from '../../utils/helpers';
+
+// ✅ Global fallback for broken or temporary blob links
+const PLACEHOLDER = "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000";
 
 export default function PublicReports() {
   const [events, setEvents] = useState([]);
@@ -16,8 +19,9 @@ export default function PublicReports() {
     const fetchEvents = async () => {
       try {
         const res = await getPublicEvents({ limit: 100 });
-        setEvents(res.data.events);
-        console.log('Fetched public events:', res.data.events);
+        // Handle different possible response structures
+        const fetchedData = res?.data?.events || res?.events || [];
+        setEvents(fetchedData);
       } catch (err) {
         console.error('Failed to load public events:', err);
       } finally {
@@ -26,6 +30,24 @@ export default function PublicReports() {
     };
     fetchEvents();
   }, []);
+
+  /**
+   * 🛡️ Helper: Validates image strings. 
+   * Returns fallback if the URL is a temporary blob or null.
+   */
+  const getSafeImage = (src) => {
+    if (!src || typeof src !== 'string' || src.startsWith('blob:')) {
+      return PLACEHOLDER;
+    }
+    return src;
+  };
+
+  /**
+   * 🛡️ Helper: Swaps broken images for a placeholder at runtime
+   */
+  const handleImageError = (e) => {
+    e.target.src = PLACEHOLDER;
+  };
 
   return (
     <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
@@ -43,236 +65,164 @@ export default function PublicReports() {
         </div>
       </header>
 
-      {/* Page Content */}
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Public Event Reports
-        </h1>
-        <p className="text-gray-500 mb-8">
-          Browse finalized event reports from all clubs
-        </p>
+        <div className="mb-10">
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+            Public Event Reports
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Official archives and results from finalized club activities.
+          </p>
+        </div>
 
         {loading ? (
-          <div className="flex justify-center py-12">
+          <div className="flex justify-center py-20">
             <Spinner size="lg" />
           </div>
-
         ) : events.length === 0 ? (
-          <div className="text-center py-20">
-            <Image className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">
-              No published event reports yet.
-            </p>
+          <div className="text-center py-24 bg-white rounded-3xl border border-gray-100 shadow-sm">
+            <ImageIcon className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+            <p className="text-gray-400 font-medium"> No published reports found.</p>
           </div>
-
         ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {events.map((event) => {
+              const previewImg = getSafeImage(event.images?.[0] || event.media?.[0]?.url);
 
-          /* Event Cards */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              return (
+                <Card
+                  key={event._id}
+                  className="group cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border-gray-100"
+                  onClick={() => setSelected(event)}
+                >
+                  <div className="aspect-video w-full overflow-hidden mb-4 rounded-xl bg-gray-100">
+                    <img
+                      src={previewImg}
+                      alt={event.title}
+                      onError={handleImageError}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
 
-            {events.map((event) => (
+                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">
+                    {event.title}
+                  </h3>
+                  <p className="text-sm text-gray-500 line-clamp-2 mb-6 leading-relaxed">
+                    {event.description}
+                  </p>
 
-              <Card
-                key={event._id}
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setSelected(event)}
-              >
-
-                {/* Event Preview Image */}
-                <img
-                  src={
-                    event.images?.length > 0
-                      ? event.images[0]
-                      : event.media?.[0]?.url ||
-                        "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000"
-                  }
-                  alt={event.title}
-                  className="w-full h-40 object-cover rounded-lg mb-4"
-                />
-
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {event.title}
-                </h3>
-
-                <p className="mt-1 text-sm text-gray-500 line-clamp-2">
-                  {event.description}
-                </p>
-
-                <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
-                  <MapPin className="h-3 w-3" />
-                  {event.club?.name}
-                  <span className="mx-1">-</span>
-                  {formatDate(event.createdAt)}
-                </div>
-
-              </Card>
-            ))}
-
+                  <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="h-3 w-3 text-indigo-400" />
+                      {event.club?.name || "Organization"}
+                    </div>
+                    <span>{formatDate(event.createdAt)}</span>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
 
-
-      {/* ================= MODAL ================= */}
-
+      {/* ================= REPORT MODAL ================= */}
       <Modal
         isOpen={!!selected}
         onClose={() => setSelected(null)}
         size="lg"
       >
-
         {selected && (
-
-          <div className="max-h-[75vh] overflow-y-auto pr-2 space-y-6">
-
-            {/* Hero Image */}
-            <div className="relative h-48 sm:h-64 w-full bg-gray-200 rounded-xl overflow-hidden mb-6 shrink-0">
-              
+          <div className="max-h-[80vh] overflow-y-auto pr-3 custom-scrollbar">
+            {/* Hero Section */}
+            <div className="relative aspect-video w-full bg-gray-100 rounded-2xl overflow-hidden mb-8 shadow-inner">
               <img
-                src={
-                  selected.images?.length > 0
-                    ? selected.images[0]
-                    : selected.media?.[0]?.url ||
-                      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000"
-                }
+                src={getSafeImage(selected.images?.[0] || selected.media?.[0]?.url)}
                 alt={selected.title}
+                onError={handleImageError}
                 className="object-cover w-full h-full"
               />
-
-              <div className="absolute top-4 left-4 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide shadow-sm">
-                Event Recap
+              <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-lg shadow-sm">
+                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                  Official Archive
+                </span>
               </div>
-
             </div>
 
-
-            {/* 🔥 Event Image Gallery */}
-            {selected.images?.length > 0 && (
-
-              <div>
-
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  Event Highlights
-                </h3>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-
+            {/* Gallery */}
+            {selected.images?.length > 1 && (
+              <div className="mb-8">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">
+                  Visual Highlights
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
                   {selected.images.map((img, i) => (
-
-                    <img
-                      key={i}
-                      src={img}
-                      alt="Event"
-                      className="w-full h-32 object-cover rounded-lg hover:scale-105 transition-transform"
-                    />
-
+                    <div key={i} className="aspect-square rounded-xl overflow-hidden border-2 border-gray-50 bg-gray-50">
+                      <img
+                        src={getSafeImage(img)}
+                        alt={`Highlight ${i}`}
+                        onError={handleImageError}
+                        className="w-full h-full object-cover hover:scale-110 transition-transform cursor-zoom-in"
+                      />
+                    </div>
                   ))}
-
                 </div>
-
               </div>
-
             )}
-
-
-            {/* Headline */}
-            <div className="border-b border-gray-100 pb-4 mb-4">
-
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight mb-3">
-                {selected.report?.headline || selected.title}
-              </h1>
-
-              <div className="flex flex-wrap items-center text-sm text-gray-500">
-
-                <span className="font-medium text-gray-700">
-                  By {selected.club?.name || 'Club'}
-                </span>
-
-                <span className="mx-2">•</span>
-
-                <time>{formatDate(selected.createdAt)}</time>
-
-                <span className="mx-2">•</span>
-
-                <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold border border-purple-100 mt-2 sm:mt-0">
-
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path>
-                  </svg>
-
-                  AI Generated
-
-                </span>
-
-              </div>
-
-            </div>
-
 
             {/* Article Content */}
-
-            {selected.report ? (
-
-              <>
-                {selected.report.leadParagraph && (
-
-                  <p className="text-lg text-gray-700 leading-relaxed font-medium">
-                    {selected.report.leadParagraph}
-                  </p>
-
-                )}
-
-                {selected.report.teamHighlights &&
-                  selected.report.teamHighlights.length > 0 && (
-
-                  <div className="bg-indigo-50 border-l-4 border-indigo-500 p-5 rounded-r-lg my-6">
-
-                    <h3 className="text-lg font-bold text-indigo-900 mb-4">
-                      Spotlight on Teamwork
-                    </h3>
-
-                    <div className="space-y-3">
-
-                      {selected.report.teamHighlights.map((highlight, index) => (
-
-                        <div
-                          key={index}
-                          className="bg-white p-3 rounded-md shadow-sm border border-indigo-100"
-                        >
-
-                          <p className="text-gray-800 text-sm">
-                            <span className="font-bold text-indigo-600">
-                              {highlight.role}:
-                            </span>{" "}
-                            {highlight.description}
-                          </p>
-
-                        </div>
-
-                      ))}
-
-                    </div>
-
+            <div className="space-y-6">
+              <div className="border-b border-gray-100 pb-6">
+                <h1 className="text-3xl font-black text-gray-900 leading-tight mb-4">
+                  {selected.report?.headline || selected.title}
+                </h1>
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                    {selected.club?.name?.[0] || "C"}
                   </div>
+                  <div>
+                    <p className="text-gray-900 font-bold">{selected.club?.name}</p>
+                    <p className="text-gray-400 text-xs">{formatDate(selected.createdAt)}</p>
+                  </div>
+                </div>
+              </div>
 
-                )}
-              </>
+              {selected.report ? (
+                <>
+                  {selected.report.leadParagraph && (
+                    <p className="text-lg text-gray-700 leading-relaxed font-medium first-letter:text-4xl first-letter:font-black first-letter:text-indigo-600 first-letter:mr-2 first-letter:float-left">
+                      {selected.report.leadParagraph}
+                    </p>
+                  )}
 
-            ) : (
-
-              <p className="text-sm text-gray-600">
-                {selected.description}
-              </p>
-
-            )}
-
+                  {selected.report.teamHighlights?.length > 0 && (
+                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                        <div className="w-1.5 h-4 bg-indigo-500 rounded-full" />
+                        Execution Breakdown
+                      </h3>
+                      <div className="grid gap-3">
+                        {selected.report.teamHighlights.map((highlight, index) => (
+                          <div key={index} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/50">
+                            <p className="text-sm text-gray-800">
+                              <span className="font-bold text-indigo-600 mr-2">{highlight.role}:</span>
+                              {highlight.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-gray-600 leading-relaxed italic">
+                  {selected.description}
+                </p>
+              )}
+            </div>
           </div>
-
         )}
-
       </Modal>
-
     </div>
   );
 }

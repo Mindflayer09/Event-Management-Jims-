@@ -7,22 +7,24 @@ const { notifyPhaseChanged, notifyEventFinalized } = require('../services/notifi
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // ==========================================
-//  🛡️ HELPER: Verify Team Admin Access
+//  🛡️ HELPER: Verify Management Access 
 // ==========================================
-// Checks if the user is a Super Admin OR holds an 'admin' accessLevel in the target team
 const verifyTeamAdmin = async (req, teamId) => {
-  // 1. Super Admin Bypass
   if (req.user.role === 'super_admin') return true;
 
-  // 2. Prevent cross-tenant modification
-  if (!req.user.team || req.user.team.toString() !== teamId.toString()) return false;
+  const targetTeamId = teamId && teamId._id ? teamId._id.toString() : teamId.toString();
+  const userTeamId = req.user.team && req.user.team._id ? req.user.team._id.toString() : req.user.team?.toString();
 
-  // 3. Verify Team Admin status in DB
-  const team = await Team.findById(teamId);
-  if (!team) return false;
+  if (!userTeamId || userTeamId !== targetTeamId) return false;
+
+  // Both Admins and Sub-Admins pass this general check for routing tasks/phases
+  if (req.user.role === 'admin' || req.user.role === 'sub-admin') return true;
+
+  const team = await Team.findById(targetTeamId);
+  if (!team || !team.members) return false;
   
   const member = team.members.find(m => m.user.toString() === req.user._id.toString());
-  return member && (member.accessLevel === 'admin' || req.user.role === 'admin');
+  return member ? member.accessLevel === 'admin' : false;
 };
 
 // ==========================================
@@ -33,7 +35,6 @@ exports.getAllEvents = async (req, res, next) => {
     const { phase, page = 1, limit = 20 } = req.query;
     let filter = {};
 
-    // ✅ THE FIX: Super Admins see everything. Regular users only see their team.
     if (req.user.role !== 'super_admin') {
       if (!req.user.team) {
         return res.status(403).json({ success: false, message: "No organization associated with this account" });
@@ -92,35 +93,22 @@ exports.getPublicEvents = async (req, res, next) => {
       status: 'published'
     });
 
-    const eventsWithReports = await Promise.all(
-      events.map(async (event) => {
-        const report = reports.find((r) => r.event.toString() === event._id.toString());
+    const eventsWithReports = events.map((event) => {
+      const report = reports.find((r) => r.event.toString() === event._id.toString());
 
-        const tasks = await Task.find({
-          event: event._id,
-          status: TASK_STATUSES.APPROVED
-        }).select('submissions');
-        
-        const images = [];
-        tasks.forEach(task => {
-          if (task.submissions && Array.isArray(task.submissions)) {
-            task.submissions.forEach(sub => {
-              if (sub.media && Array.isArray(sub.media)) {
-                sub.media.forEach(m => {
-                  if (m.url) images.push(m.url);
-                });
-              }
-            });
-          }
-        });
+      let images = [];
+      if (report && report.galleryImages && report.galleryImages.length > 0) {
+        images = report.galleryImages;
+      } else if (event.media && event.media.length > 0) {
+        images = event.media.map(m => m.url);
+      }
 
-        return {
-          ...event.toObject(),
-          report: report ? report.content : '',
-          images
-        };
-      })
-    );
+      return {
+        ...event.toObject(),
+        report: report ? report.content : '',
+        images
+      };
+    });
 
     const total = await Event.countDocuments({ isPublic: true, isFinalized: true });
 
@@ -131,7 +119,6 @@ exports.getPublicEvents = async (req, res, next) => {
         pagination: { page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)), totalItems: total },
       },
     });
-
   } catch (error) {
     next(error);
   }
@@ -148,7 +135,6 @@ exports.getEventById = async (req, res, next) => {
 
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
 
-    // 🛡️ Ensure users can't snoop on other teams' private events
     if (req.user.role !== 'super_admin' && event.team._id.toString() !== req.user.team?.toString()) {
       return res.status(403).json({ success: false, message: 'Access denied to this organization\'s event' });
     }
@@ -218,7 +204,6 @@ exports.updateEvent = async (req, res, next) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
 
-    // ✅ SECURED: Fetch event first, THEN check if user is admin of THAT event's team
     const isAdmin = await verifyTeamAdmin(req, event.team);
     if (!isAdmin) return res.status(403).json({ success: false, message: 'Only team administrators can edit events.' });
     
@@ -248,7 +233,6 @@ exports.deleteEvent = async (req, res, next) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
 
-    // ✅ SECURED
     const isAdmin = await verifyTeamAdmin(req, event.team);
     if (!isAdmin) return res.status(403).json({ success: false, message: 'Only team administrators can delete events.' });
 
@@ -269,7 +253,6 @@ exports.changePhase = async (req, res, next) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
 
-    // ✅ SECURED
     const isAdmin = await verifyTeamAdmin(req, event.team);
     if (!isAdmin) return res.status(403).json({ success: false, message: 'Only team administrators can change event phases.' });
 
@@ -315,9 +298,13 @@ exports.finalizeEvent = async (req, res, next) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
 
-    // ✅ SECURED
     const isAdmin = await verifyTeamAdmin(req, event.team);
-    if (!isAdmin) return res.status(403).json({ success: false, message: 'Only team administrators can finalize events.' });
+    if (!isAdmin) return res.status(403).json({ success: false, message: 'Unauthorized access.' });
+
+    // 🚀 SECURITY BLOCK: Sub-Admins cannot finalize events
+    if (req.user.role === 'sub-admin') {
+      return res.status(403).json({ success: false, message: 'Sub-Admins cannot finalize events. Only Full Admins have this permission.' });
+    }
 
     if (event.phase !== EVENT_PHASES.POST) return res.status(400).json({ success: false, message: 'Event must be in post-event phase to finalize' });
     if (event.isFinalized) return res.status(400).json({ success: false, message: 'Event is already finalized' });
@@ -362,64 +349,98 @@ exports.addMedia = async (req, res, next) => {
   }
 };
 
-// ==========================================
-// POST /api/events/:id/generate-report
+/// ==========================================
+// POST /api/events/:id/generate-report (BULLETPROOF)
 // ==========================================
 exports.generateEventReport = async (req, res, next) => {
   try {
+    // 1. Check for API Key before doing anything
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("CRITICAL: GEMINI_API_KEY is missing from backend .env file");
+      return res.status(500).json({ success: false, message: 'Server misconfiguration: AI key missing.' });
+    }
+
     const event = await Event.findById(req.params.id).populate('team', 'name'); 
     if (!event) return res.status(404).json({ success: false, message: 'Event not found' });
 
-    // ✅ SECURED
     const isAdmin = await verifyTeamAdmin(req, event.team._id);
-    if (!isAdmin) return res.status(403).json({ success: false, message: 'Only team administrators can generate PR reports.' });
+    if (!isAdmin) return res.status(403).json({ success: false, message: 'Unauthorized access.' });
+
+    if (req.user.role === 'sub-admin') {
+      return res.status(403).json({ success: false, message: 'Sub-Admins cannot generate AI reports. Only Full Admins have this permission.' });
+    }
+
+    if (!event.isFinalized) {
+      return res.status(400).json({ success: false, message: 'The event must be officially Finalized before the AI can generate the public report.' });
+    }
 
     const tasks = await Task.find({ 
       event: event._id, 
       status: TASK_STATUSES.APPROVED 
     }).populate('assignedTo', 'name');
 
-    const taskSummaries = tasks.map(t => {
-      const volunteerName = t.assignedTo ? t.assignedTo.name.split(' ')[0] : 'A volunteer';
+    if (tasks.length === 0) {
+      return res.status(400).json({ success: false, message: 'No approved tasks found. Volunteers must submit proof of work before AI can generate a report.' });
+    }
+
+    // 2. Safely extract images and task details
+    const allImages = [];
+    const taskDetails = tasks.map(t => {
+      if (t.submissions && Array.isArray(t.submissions)) {
+        t.submissions.forEach(sub => {
+          if (sub.media && Array.isArray(sub.media)) {
+            sub.media.forEach(m => { if (m.url) allImages.push(m.url); });
+          }
+        });
+      }
+      const volunteerName = t.assignedTo ? t.assignedTo.name.split(' ')[0] : 'Volunteer';
       return `- ${t.title} (Completed by: ${volunteerName})`;
     }).join('\n');
 
     const prompt = `
-      You are an expert Public Relations Officer for the organization "${event.team.name}".
-      Your job is to write a professional, engaging, and polished post-event report for the general public.
+      Write a professional PR report for the event: "${event.title}".
+      Description: ${event.description}
+      Organization: ${event.team.name}
+      Highlights:
+      ${taskDetails}
 
-      Event Data:
-      - Title: ${event.title}
-      - Description: ${event.description}
-      
-      Key Accomplishments (Tasks Completed):
-      ${taskSummaries || 'Routine event setup and execution.'}
-
-      Rules:
-      1. Use a formal, celebratory, and community-focused tone.
-      2. NEVER invent or hallucinate metrics, numbers, names, or events. Only use the provided data.
-      3. DO NOT include sensitive information, internal disputes, or financial/budget details.
-      4. You MUST return the response strictly as a JSON object with the following structure:
-         {
-           "headline": "A catchy, news-style headline",
-           "leadParagraph": "A 2-3 sentence engaging summary of the event",
-           "teamHighlights": [
-             { "role": "Task Title", "description": "1 sentence describing the contribution and naming the volunteer" }
-           ]
-         }
+      Instructions:
+      1. Keep a celebratory and engaging tone.
+      2. Return ONLY a pure JSON object. Do not include markdown formatting or backticks.
+      {
+        "headline": "A news-style headline",
+        "leadParagraph": "A short engaging summary",
+        "teamHighlights": [{ "role": "Task Name", "description": "1 sentence recap" }]
+      }
     `;
 
+    // 3. Initialize AI
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    
+    // 🚀 FIXED: Removed the generationConfig that was causing the 404 crash
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" } 
+      model: "gemini-2.5-flash"
     });
 
+    // 4. Generate Content
     const result = await model.generateContent(prompt);
-    const generatedJSON = JSON.parse(result.response.text());
     
+    // 5. Fault-Tolerant JSON Parsing
+    let generatedJSON;
+    try {
+      let rawText = result.response.text();
+      // Strip markdown backticks if Gemini accidentally includes them
+      rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      generatedJSON = JSON.parse(rawText);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', result.response.text());
+      return res.status(500).json({ success: false, message: 'AI generated invalid data format. Please try again.' });
+    }
+    
+    // 6. Database Save
     let report = await Report.findOne({ event: event._id });
-    
+    const reportImageFallback = allImages.length > 0 ? allImages[0] : (event.media?.[0]?.url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87");
+
     if (!report) {
       report = new Report({
         event: event._id,
@@ -427,28 +448,25 @@ exports.generateEventReport = async (req, res, next) => {
         content: generatedJSON, 
         createdBy: req.user._id,
         status: 'published',
-        isPublic: 'true',
+        isPublic: true,
+        reportImage: reportImageFallback,
+        galleryImages: allImages
       });
     } else {
       report.content = generatedJSON; 
       report.status = 'published';
-      report.isPublic = 'true';
+      report.isPublic = true;
+      report.reportImage = reportImageFallback;
+      report.galleryImages = allImages;
     }
-    await report.save();
 
-    event.reportStatus = event.targetStatus;
-    await event.save();
+    await report.save(); 
 
-    res.json({ 
-      success: true, 
-      message: 'AI Draft generated successfully', 
-      data: { 
-        report: { _id: report._id, content: generatedJSON, status: event.targetStatus, isPublic: event.targetIsPublic }
-      } 
-    });
+    res.json({ success: true, message: 'AI Report created successfully!', data: { report } });
     
   } catch (error) {
-    console.error('AI Generation Error:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate AI report' });
+    // 7. Catch everything else and print it clearly
+    console.error('FATAL AI ROUTE ERROR:', error);
+    res.status(500).json({ success: false, message: error.message || 'Internal server error during report generation' });
   }
 };

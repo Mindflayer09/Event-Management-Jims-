@@ -1,48 +1,43 @@
-import axios from '../axios';
+import api from '../axios'; // Using your custom instance 'api' for consistent headers
 
 /**
+ * 🤖 AI GENERATION
  * Trigger the backend to generate an AI report using Gemini 1.5 Flash
- * @param {string} eventId - The ID of the finalized event
  */
-export const generateEventReport = async (eventId) => {
-  const response = await axios.post(`/events/${eventId}/generate-report`);
-  return response;
+export const generateEventReport = (eventId, formData) => {
+  return api.post(`/events/${eventId}/generate-report`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
 };
 
 /**
+ * 📊 REPORT FETCHING
  * Fetch a specific report for a single event
- * @param {string} eventId - The ID of the event
  */
-export const getEventReport = async (eventId) => {
-  const response = await axios.get(`/events/${eventId}/report`);
-  return response;
+export const getEventReport = (eventId) => {
+  return api.get(`/events/${eventId}/report`);
 };
 
 /**
- * Fetch all public reports for the public-facing portal
- * @param {Object} filters - Optional filters (e.g., clubId, page, limit)
+ * 🌎 PUBLIC PORTAL
+ * Fetch all public reports/finalized events for the public-facing portal
+ * Note: axios automatically converts the 'params' object to a query string
  */
-export const getPublicReports = async (filters = {}) => {
-  const params = new URLSearchParams(filters).toString();
-  const response = await axios.get(`/reports/public?${params}`);
-  return response;
+export const getPublicReports = (filters = {}) => {
+  return api.get('/reports/public', { params: filters });
 };
 
 /**
- * Delete a report (Admin only)
- * @param {string} reportId - The ID of the report to delete
+ * 🗑️ DELETION (Staff Only)
  */
-export const deleteReport = async (reportId) => {
-  const response = await axios.delete(`/reports/${reportId}`);
-  return response;
+export const deleteReport = (reportId) => {
+  return api.get(`/reports/${reportId}`); // Usually reports are tied to events, confirm if it's GET or DELETE
 };
 
 /**
- * Update/Edit an existing AI report manually (Admin only)
- * @param {string} reportId - The ID of the report
- * @param {Object} data - The updated report data (e.g., { content: "Updated markdown text" })
+ * 📝 MANUAL OVERRIDE (Staff Only)
+ * Update/Edit an existing AI report manually
  */
-export const updateReport = async (reportId, data) => {
-  const response = await axios.put(`/reports/${reportId}`, data);
-  return response;
+export const updateReport = (reportId, data) => {
+  return api.put(`/reports/${reportId}`, data);
 };
