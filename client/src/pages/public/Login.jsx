@@ -67,24 +67,24 @@ export default function Login({ onSuccess, switchToRegister }) {
   // ==========================================
   // Google Login Hand-off
   // ==========================================
-  const handleGoogleSuccess = (googleData) => {
-    if (googleData && googleData.token) {
-      // 1. Save the token exactly like your old Google button did
-      localStorage.setItem('token', googleData.token);
-      
-      toast.success('Welcome back!');
-      
-      if (onSuccess) {
-        onSuccess(); 
-      }
+ // Inside Login.jsx
+const handleGoogleSuccess = (googleData) => {
+  console.log("📦 Login Component Received:", googleData);
+  const token = googleData?.token || googleData?.data?.token;
 
-      // 2. We use window.location here instead of navigate() to force a hard reload. 
-      // This guarantees your AuthContext re-runs its initialization and sees the new token!
-      window.location.href = '/dashboard';
-    } else {
-      toast.error('Google login failed: No valid session found.');
+  if (token) {
+    localStorage.setItem('token', token);
+    
+    toast.success('Welcome back!');
+    
+    if (onSuccess) {
+      onSuccess(); 
     }
-  };
+    window.location.href = '/dashboard';
+  } else {
+    toast.error('Google login failed: No valid session found.');
+  }
+};
 
   return (
     <div className="w-full max-w-md mx-auto">

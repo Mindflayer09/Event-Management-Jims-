@@ -8,26 +8,23 @@ const GoogleAuthButton = ({ actionText = "Continue with Google", onGoogleSuccess
   const [loading, setLoading] = useState(false);
 
   const login = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setError('');
-      try {
-        // Send the token to your backend
-        const res = await axios.post(`${import.meta.env.VITE_API_URL}/auth/google`, {
-          token: tokenResponse.access_token,
-        });
-
-        // 🚀 THE FIX: Pass the data back to Register.jsx and STOP.
-        // No navigating, no local storage saving. Just trigger Step 2!
-        if (onGoogleSuccess) {
-          onGoogleSuccess(res.data.data);
-        }
-      } catch (err) {
-        setError(err.response?.data?.message || 'Google Authentication failed');
-      } finally {
-        setLoading(false);
-      }
-    },
+   onSuccess: async (tokenResponse) => {
+  setLoading(true);
+  setError('');
+  try {
+    const res = await axios.post(`${import.meta.env.VITE_API_URL}/auth/google`, {
+      token: tokenResponse.access_token,
+    });
+    console.log("🚀 Backend Google Response:", res.data);
+    if (onGoogleSuccess) {
+      onGoogleSuccess(res.data); 
+    }
+  } catch (err) {
+    setError(err.response?.data?.message || 'Google Authentication failed');
+  } finally {
+    setLoading(false);
+  }
+},
     onError: () => setError('Google Login Failed'),
   });
 
