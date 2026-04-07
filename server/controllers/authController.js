@@ -278,7 +278,7 @@ exports.resetPassword = async (req, res, next) => {
 };
 
 // ==========================================
-// GOOGLE AUTH: Verify Google & Send OTP
+// GOOGLE AUTH: Verify Google & Send OTP or Login
 // ==========================================
 exports.googleAuth = async (req, res, next) => {
   try {
@@ -292,13 +292,12 @@ exports.googleAuth = async (req, res, next) => {
     const googleResponse = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
     const { email, name } = googleResponse.data;
     
-    // 2. Check if the user already exists in the database
-    const existingUser = await User.findOne({ email });
+    // 2. Check if user exists AND populate team (matches standard login behavior)
+    const existingUser = await User.findOne({ email }).populate('team', 'name');
 
     if (existingUser) {
-      const jwtToken = jwt.sign({ id: existingUser._id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE || '30d'
-      });
+      // 🚀 THE FIX: Use your standard token generator!
+      const jwtToken = generateToken(existingUser);
 
       return res.status(200).json({
         success: true,
@@ -309,7 +308,8 @@ exports.googleAuth = async (req, res, next) => {
         } 
       });
     }
-    // 3. Generate OTP
+
+    // 3. REGISTRATION FLOW: Generate OTP for new user
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     await OTP.deleteMany({ email }); 
     await OTP.create({ email, otp: otpCode });
@@ -331,11 +331,10 @@ exports.googleAuth = async (req, res, next) => {
 
   } catch (error) {
     console.error("Google Auth Error:", error);
+    // Removed the debug stack traces so your backend stays secure in production!
     res.status(401).json({ 
       success: false, 
-      message: 'Google authentication failed.',
-      errorDetails: error.message,
-      stack: error.stack,           
+      message: 'Google authentication failed.'
     });
   }
 };
