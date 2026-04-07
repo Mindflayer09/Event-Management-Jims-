@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom'; // ✅ Added for navigation
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Building2, UploadCloud, X } from 'lucide-react'; // ✅ Added X for clearing file
+import { Building2, UploadCloud, X } from 'lucide-react';
 
 // Services
-import { createTeam } from '../../api/services/team.service'; // ✅ Corrected import
+import { createTeam } from '../../api/services/team.service';
 
 // Components
 import Button from '../../components/common/Button';

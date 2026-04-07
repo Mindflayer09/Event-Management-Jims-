@@ -38,6 +38,11 @@ import {
   Clock
 } from 'lucide-react';
 
+// 🚀 FIX: Extract Vite variables globally so the bundler can guarantee injection
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
 const taskSchema = z.object({
   title: z.string().min(3, 'Title is required'),
   description: z.string().min(5, 'Description is required'),
@@ -177,11 +182,9 @@ export default function TeamTasks() {
     const toastId = toast.loading('Uploading images and submitting work...');
 
     try {
-      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-      if (!cloudName || !uploadPreset) {
-        throw new Error("Missing Cloudinary config in .env file!");
+      // 🚀 FIX: Use the globally extracted variables
+      if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+        throw new Error("Missing Cloudinary config in Vercel settings!");
       }
 
       const uploadedMedia = [];
@@ -189,9 +192,10 @@ export default function TeamTasks() {
       for (const file of selectedFiles) {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('upload_preset', uploadPreset); 
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET); 
         
-        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        // 🚀 FIX: Use the globally generated URL string
+        const uploadRes = await fetch(CLOUDINARY_URL, {
           method: 'POST',
           body: formData,
         });

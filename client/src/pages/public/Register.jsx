@@ -220,6 +220,8 @@ export default function Register({ onSuccess, switchToLogin, preSelectedTeamId =
             />
             
             <Input 
+              id="userEmail"
+              autoComplete="email"
               label="Email" 
               type="email" 
               placeholder="you@example.com" 
