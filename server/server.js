@@ -35,7 +35,7 @@ app.use(
   })
 );
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: process.env.CLIENT_URL || 'https://replannex.vercel.app',
   credentials: true,
 }));
 app.use(generalLimiter);
