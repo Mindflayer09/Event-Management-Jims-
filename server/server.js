@@ -74,8 +74,8 @@ const start = async () => {
   try {
     await connectDB();
     connectCloudinary();
-
-    app.listen(PORT, () => {
+    
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
       console.log(`📡 DNS Resolution Order: IPv4 Preferred`);
     });
