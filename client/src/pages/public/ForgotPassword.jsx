@@ -1,6 +1,9 @@
 // src/pages/public/ForgotPassword.jsx
 import React, { useState } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
+import { Calendar } from 'lucide-react';
+import ThemeToggle from '../../components/common/ThemeToggle';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -25,23 +28,32 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 font-sans">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4 font-sans transition-colors duration-200">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl">
         
-        <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Forgot Password?</h2>
-        <p className="text-sm text-gray-500 mb-8 text-center">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-2">
+          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+            <Calendar className="h-7 w-7" />
+            PlannEx
+          </Link>
+          <ThemeToggle />
+        </div>
+        
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">Forgot Password?</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 text-center">
           No worries, we'll send you reset instructions.
         </p>
         
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
           <div className="flex flex-col text-left">
-            <label htmlFor="email" className="text-sm font-medium text-gray-700 mb-1.5">
+            <label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Email Address
             </label>
             <input 
               id="email"
               type="email" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               placeholder="e.g. name@company.com" 
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 

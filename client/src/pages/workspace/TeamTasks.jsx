@@ -266,9 +266,9 @@ export default function TeamTasks() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-12 px-4">
+    <div className="max-w-7xl mx-auto pb-12 px-4 sm:px-6">
       {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg">
             <ClipboardCheck className="h-6 w-6 text-white" />
@@ -282,7 +282,7 @@ export default function TeamTasks() {
         </div>
         
         <div className="flex items-center gap-3">
-          <select className="rounded-2xl border-gray-100 shadow-sm text-sm bg-gray-50 px-4 py-2 outline-none" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <select className="rounded-2xl border-gray-100 shadow-sm text-sm bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-gray-100 px-4 py-2 outline-none" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">Filter: All</option>
             <option value="pending">🟡 Pending</option>
             <option value="submitted">🔵 Reviewing</option>
@@ -386,12 +386,12 @@ export default function TeamTasks() {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <select className="rounded-xl border border-gray-200 p-3 text-sm outline-none bg-white" {...register('event')}>
+            <select className="rounded-xl border border-gray-200 p-3 text-sm outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-gray-100" {...register('event')}>
               <option value="">Select Event</option>
               {teamEvents.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
             </select>
             
-            <select className="rounded-xl border border-gray-200 p-3 text-sm outline-none bg-white" {...register('assignedTo')}>
+            <select className="rounded-xl border border-gray-200 p-3 text-sm outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-gray-100" {...register('assignedTo')}>
               <option value="">Select Assignee</option>
               {teamMembers
                 .filter(m => ['sub-admin', 'volunteer', 'user'].includes(m.role))
@@ -405,7 +405,7 @@ export default function TeamTasks() {
           
           <div className="grid grid-cols-2 gap-4">
             <Input type="date" label="Deadline" {...register('deadline')} />
-            <select className="rounded-xl border border-gray-200 p-3 text-sm mt-6 outline-none bg-white" {...register('priority')}>
+              <select className="rounded-xl border border-gray-200 p-3 text-sm mt-6 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-gray-100" {...register('priority')}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -427,7 +427,7 @@ export default function TeamTasks() {
       {/* MODAL 2: VOLUNTEER SUBMISSION */}
       <Modal isOpen={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Upload Completed Work">
         <form onSubmit={onVolunteerSubmit} className="space-y-6">
-          <textarea rows={3} className="block w-full rounded-2xl border border-gray-100 p-4 text-sm bg-gray-50/50" placeholder="Work notes..." value={submissionNotes} onChange={(e) => setSubmissionNotes(e.target.value)} required />
+          <textarea rows={3} className="block w-full rounded-2xl border border-gray-100 p-4 text-sm bg-gray-50/50 dark:bg-slate-900 dark:border-slate-700 dark:text-gray-100" placeholder="Work notes..." value={submissionNotes} onChange={(e) => setSubmissionNotes(e.target.value)} required />
           
           <div className="border-2 border-dashed border-gray-200 rounded-3xl p-8 text-center relative hover:bg-indigo-50/30 transition-all">
             <input type="file" multiple accept="image/*" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isUploading} />
@@ -484,7 +484,7 @@ export default function TeamTasks() {
       {/* MODAL 4: TASK DELEGATION */}
       <Modal isOpen={showDelegateModal} onClose={() => setShowDelegateModal(false)} title="Delegate Assignment">
         <div className="space-y-6">
-          <select className="block w-full rounded-2xl border border-gray-100 p-4 text-sm bg-gray-50/50 outline-none" value={selectedVolunteer} onChange={(e) => setSelectedVolunteer(e.target.value)}>
+          <select className="w-full rounded-2xl border border-gray-100 p-4 text-sm bg-gray-50/50 dark:bg-slate-900 dark:border-slate-700 dark:text-gray-100 outline-none" value={selectedVolunteer} onChange={(e) => setSelectedVolunteer(e.target.value)}>
             <option value="">Choose a member...</option>
             {teamMembers.filter(m => ['user', 'volunteer'].includes(m.role)).map(v => <option key={v._id} value={v._id}>{v.name}</option>)}
           </select>

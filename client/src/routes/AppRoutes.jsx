@@ -56,49 +56,52 @@ function DashboardRedirect() {
 
 export default function AppRoutes() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          {/* ========================================== */}
-          {/* PUBLIC ROUTES                              */}
-          {/* ========================================== */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/reports" element={<PublicReports />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          
-          {/* The Central Redirect Gate */}
-          <Route path="/dashboard" element={<DashboardRedirect />} />
+    // 🚀 NEW: Global Canvas Styling for Dark Mode
+    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+              {/* ========================================== */}
+              {/* PUBLIC ROUTES                              */}
+              {/* ========================================== */}
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/reports" element={<PublicReports />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
+              
+              {/* The Central Redirect Gate */}
+              <Route path="/dashboard" element={<DashboardRedirect />} />
 
-          {/* ========================================== */}
-          {/* SUPER ADMIN ROUTES (SaaS Management)       */}
-          {/* ========================================== */}
-          <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/super-admin/dashboard" element={<PlatformDashboard />} />
-              <Route path="/super-admin/organizations/new" element={<CreateOrganization />} />
-              <Route path="/super-admin/users" element={<UserManagement />} />
-            </Route>
-          </Route>
+              {/* ========================================== */}
+              {/* SUPER ADMIN ROUTES (SaaS Management)       */}
+              {/* ========================================== */}
+              <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
+                <Route element={<DashboardLayout />}>
+                  <Route path="/super-admin/dashboard" element={<PlatformDashboard />} />
+                  <Route path="/super-admin/organizations/new" element={<CreateOrganization />} />
+                  <Route path="/super-admin/users" element={<UserManagement />} />
+                </Route>
+              </Route>
 
-          {/* ========================================== */}
-          {/* WORKSPACE ROUTES (Team Admins & Members)   */}
-          {/* ========================================== */}
-          <Route element={<ProtectedRoute allowedRoles={['admin', 'sub-admin', 'volunteer']} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/workspace/dashboard" element={<WorkspaceOverview />} />
-              <Route path="/workspace/events" element={<TeamEvents />} />
-              <Route path="/workspace/tasks" element={<TeamTasks />} />
-              <Route path="/workspace/members" element={<TeamMembers />} />
-            </Route>
-          </Route>
+              {/* ========================================== */}
+              {/* WORKSPACE ROUTES (Team Admins & Members)   */}
+              {/* ========================================== */}
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'sub-admin', 'volunteer']} />}>
+                <Route element={<DashboardLayout />}>
+                  <Route path="/workspace/dashboard" element={<WorkspaceOverview />} />
+                  <Route path="/workspace/events" element={<TeamEvents />} />
+                  <Route path="/workspace/tasks" element={<TeamTasks />} />
+                  <Route path="/workspace/members" element={<TeamMembers />} />
+                </Route>
+              </Route>
 
-          {/* 404 Catch-All */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+              {/* 404 Catch-All */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </div>
   );
 }

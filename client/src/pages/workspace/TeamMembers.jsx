@@ -73,8 +73,8 @@ export default function ManageUsers() {
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Manage Members</h1>
+    <div className="text-gray-900 dark:text-gray-100">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Manage Members</h1>
 
       <div className="flex gap-2 mb-6">
         {['all', 'pending', 'approved'].map((f) => (
@@ -84,7 +84,7 @@ export default function ManageUsers() {
             className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
               filter === f
                 ? 'bg-indigo-600 text-white'
-                : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+                : 'bg-white dark:bg-slate-800 dark:text-gray-100 text-gray-600 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-900'
             }`}
           >
             {f}
@@ -103,14 +103,14 @@ export default function ManageUsers() {
       ) : (
         <Card className="overflow-x-auto p-0!">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Organization</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">App Role</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-300">Name</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-300">Email</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-300">Organization</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-300">App Role</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-300">Status</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
 
@@ -126,8 +126,8 @@ export default function ManageUsers() {
                 const canManage = currentUserPower > targetUserPower;
 
                 return (
-                  <tr key={user._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                  <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-slate-900">
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                       {user.name}
                       {isSelf && <span className="ml-2 text-xs text-indigo-600">(You)</span>}
                     </td>

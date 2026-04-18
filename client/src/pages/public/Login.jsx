@@ -9,6 +9,7 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { Calendar, Eye, EyeOff } from 'lucide-react';
 import GoogleAuthButton from '../../components/auth/GoogleAuthButton';
+import ThemeToggle from '../../components/common/ThemeToggle';
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -90,16 +91,19 @@ const handleGoogleSuccess = (googleData) => {
     <div className="w-full max-w-md mx-auto">
       {/* Header */}
       <div className="text-center mb-6">
-        <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600">
-          <Calendar className="h-7 w-7" />
-          PlannEx
-        </Link>
-        <h2 className="mt-4 text-2xl font-bold text-gray-900">Sign in to your account</h2>
-        <p className="mt-2 text-sm text-gray-500">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+            <Calendar className="h-7 w-7" />
+            PlannEx
+          </Link>
+          <ThemeToggle />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Sign in to your account</h2>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           Don't have an account?{" "}
           <button
             onClick={switchToRegister || (() => navigate('/register'))}
-            className="text-indigo-600 font-medium hover:underline cursor-pointer"
+            className="text-indigo-600 font-medium hover:underline cursor-pointer dark:text-indigo-400 dark:hover:text-indigo-300"
           >
             Register
           </button>
@@ -107,7 +111,7 @@ const handleGoogleSuccess = (googleData) => {
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-200">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           
           <Input

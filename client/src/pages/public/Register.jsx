@@ -11,6 +11,7 @@ import Select from "../../components/common/Select";
 import Button from "../../components/common/Button";
 import { Calendar, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import GoogleAuthButton from '../../components/auth/GoogleAuthButton';
+import ThemeToggle from '../../components/common/ThemeToggle';
 
 const schema = z
   .object({
@@ -185,14 +186,17 @@ export default function Register({ onSuccess, switchToLogin, preSelectedTeamId =
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-6">
-        <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600">
-          <Calendar className="h-7 w-7" />
-          PlannEx
-        </Link>
-        <h2 className="mt-4 text-2xl font-bold text-gray-900">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+            <Calendar className="h-7 w-7" />
+            PlannEx
+          </Link>
+          <ThemeToggle />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
           {step === 1 ? "Create account" : "Verify your email"}
         </h2>
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
           {step === 1 ? (
             <>
               Already have an account?{" "}
@@ -206,7 +210,7 @@ export default function Register({ onSuccess, switchToLogin, preSelectedTeamId =
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-200">
         
         {/* ==================== STEP 1: USER DETAILS FORM ==================== */}
         {step === 1 && (

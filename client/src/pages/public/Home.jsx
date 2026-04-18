@@ -7,6 +7,8 @@ import { useAuth } from "../../context/AuthContext";
 import Login from "./Login";
 import Register from "./Register";
 import Modal from "../../components/common/Modal";
+import Footer from '../../components/layout/Footer';
+import ThemeToggle from '../../components/common/ThemeToggle'; 
 
 export default function Home() {
   const [teams, setTeams] = useState([]); 
@@ -18,7 +20,6 @@ export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   
-  // ✅ NEW: State to hold the team ID when a card is clicked
   const [preSelectedTeam, setPreSelectedTeam] = useState("");
 
   useEffect(() => {
@@ -51,7 +52,6 @@ export default function Home() {
     if (isAuthenticated) {
       handleDashboardNavigation();
     } else {
-      // ✅ SAVE the team ID before opening the register modal
       setPreSelectedTeam(teamId);
       setAuthMode("register");
       setShowAuthModal(true);
@@ -59,17 +59,23 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
-      {/* HEADER */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="text-xl font-bold text-indigo-600 flex items-center gap-2">
+    // 🚀 FIX 1: Added dark: gradients to the main background wrapper
+    <div className="min-h-screen flex flex-col bg-linear-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-colors duration-300">
+      
+      {/* 🚀 FIX 2: Added dark: bg and borders to the Header */}
+      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-auto sm:h-16 flex flex-col sm:flex-row flex-wrap items-center justify-between gap-3 py-3 sm:py-0">
+          <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
             <Calendar className="h-6 w-6" />
             PlannEx
           </Link>
 
           <div className="flex items-center gap-4">
-            <Link to="/reports" className="text-sm text-gray-600 hover:text-gray-900">
+            {/* Added ThemeToggle here! */}
+            <ThemeToggle />
+
+            {/* 🚀 FIX 3: Updated text colors for links */}
+            <Link to="/reports" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors">
               Public Reports
             </Link>
 
@@ -84,17 +90,17 @@ export default function Home() {
               <div className="flex gap-4">
                 <button
                   onClick={() => { 
-                    setPreSelectedTeam(""); // Clear team if standard login clicked
+                    setPreSelectedTeam(""); 
                     setAuthMode("login"); 
                     setShowAuthModal(true); 
                   }}
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 cursor-pointer transition-colors"
                 >
                   Login
                 </button>
                 <button
                   onClick={() => { 
-                    setPreSelectedTeam(""); // Clear team if standard register clicked
+                    setPreSelectedTeam(""); 
                     setAuthMode("register"); 
                     setShowAuthModal(true); 
                   }}
@@ -108,54 +114,61 @@ export default function Home() {
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900">
-          Multi-Tenant <span className="text-indigo-600">Event Management System</span>
-        </h1>
-        <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-          One platform, multiple organizations. Manage your team's events, 
-          track tasks, and generate professional reports seamlessly.
-        </p>
-      </section>
+      <main className="grow">
+        {/* HERO */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+          {/* 🚀 FIX 4: Made the main heading text white in dark mode */}
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white transition-colors duration-300">
+            Multi-Tenant <span className="text-indigo-600 dark:text-indigo-400">Event Management System</span>
+          </h1>
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto transition-colors duration-300">
+            One platform, multiple organizations. Manage your team's events, 
+            track tasks, and generate professional reports seamlessly.
+          </p>
+        </section>
 
-      {/* TEAM GRID */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
-          Explore Organizations
-        </h2>
+        {/* TEAM GRID */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center transition-colors duration-300">
+            Explore Organizations
+          </h2>
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Spinner size="lg" />
-          </div>
-        ) : teams.length === 0 ? (
-          <p className="text-center text-gray-500 py-12">No organizations registered yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {teams.map((team) => (
-              <div
-                key={team._id}
-                onClick={() => handleTeamNavigation(team._id)}
-                className="cursor-pointer group bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-300 transition-all duration-200"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="h-12 w-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                    <Building2 className="h-6 w-6" />
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Spinner size="lg" />
+            </div>
+          ) : teams.length === 0 ? (
+            <p className="text-center text-gray-500 dark:text-gray-400 py-12">No organizations registered yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {teams.map((team) => (
+                <div
+                  key={team._id}
+                  onClick={() => handleTeamNavigation(team._id)}
+                  // 🚀 FIX 5: Added dark mode backgrounds, borders, and hovers to the Cards
+                  className="cursor-pointer group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg dark:hover:shadow-gray-900/50 hover:border-indigo-300 dark:hover:border-indigo-500 transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="h-12 w-12 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                      <Building2 className="h-6 w-6" />
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-300 dark:text-gray-600 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors" />
                   </div>
-                  <ArrowRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+                  <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {team.name}
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                    {team.description || "Active organization on EventFlow SaaS."}
+                  </p>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold text-gray-900 group-hover:text-indigo-600">
-                  {team.name}
-                </h3>
-                <p className="mt-2 text-sm text-gray-500 line-clamp-2">
-                  {team.description || "Active organization on EventFlow SaaS."}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+
+      {/* FOOTER */}
+      <Footer />
 
       {/* AUTH MODAL */}
       <Modal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} size="md">
@@ -165,7 +178,6 @@ export default function Home() {
           <Register 
             onSuccess={() => setShowAuthModal(false)} 
             switchToLogin={() => setAuthMode("login")} 
-            // ✅ PASS the team ID to the Register component as a prop
             preSelectedTeamId={preSelectedTeam} 
           />
         )}

@@ -6,6 +6,7 @@ import Spinner from '../../components/common/Spinner';
 import Card from '../../components/common/Card';
 import Modal from '../../components/common/Modal';
 import { formatDate } from '../../utils/helpers';
+import ThemeToggle from '../../components/common/ThemeToggle';
 
 // ✅ Global fallback for broken or temporary blob links
 const PLACEHOLDER = "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1000";
@@ -50,28 +51,31 @@ export default function PublicReports() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
+    <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-colors duration-300">
       
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link to="/" className="text-xl font-bold text-indigo-600 flex items-center gap-2">
+      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-auto sm:h-16 flex flex-col sm:flex-row flex-wrap items-center justify-between gap-3 py-3 sm:py-0">
+          <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
             <Calendar className="h-6 w-6" />
             PlannEx
           </Link>
-          <Link to="/login" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-            Login
-          </Link>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link to="/login" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+              Login
+            </Link>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-10">
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
             Public Event Reports
           </h1>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-500 dark:text-gray-400 mt-2">
             Official archives and results from finalized club activities.
           </p>
         </div>
@@ -155,7 +159,7 @@ export default function PublicReports() {
                 <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">
                   Visual Highlights
                 </h4>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {selected.images.map((img, i) => (
                     <div key={i} className="aspect-square rounded-xl overflow-hidden border-2 border-gray-50 bg-gray-50">
                       <img

@@ -116,24 +116,24 @@ export default function WorkspaceOverview() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto pb-12 px-4 sm:px-6">
+    <div className="max-w-7xl mx-auto pb-12 px-4 sm:px-6 lg:px-8">
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-10 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center items-start justify-between mb-10 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-800">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg">
             <LayoutDashboard className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-gray-900">
+            <h1 className="text-xl font-black text-gray-900 dark:text-white">
               {isAdmin ? 'Admin Panel' : isSubAdmin ? 'Sub-Admin Workspace' : 'My Dashboard'}
             </h1>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{user?.team?.name}</p>
+            <p className="text-xs font-bold text-gray-400 dark:text-gray-400 uppercase tracking-widest">{user?.team?.name}</p>
           </div>
         </div>
       </div>
 
       {/* STATS GRID */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
         {cards.map(({ label, value, icon: Icon, color, route }) => (
           <Card key={label} onClick={() => navigate(route)} className="cursor-pointer border-transparent hover:border-indigo-100 transition-all rounded-3xl group">
             <div className="flex flex-col items-center text-center gap-3">

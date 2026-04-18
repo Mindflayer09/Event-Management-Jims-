@@ -60,10 +60,10 @@ export default function UserManagement() {
   }, {});
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 text-gray-900 dark:text-gray-100">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Platform User Directory</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Platform User Directory</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           A complete list of all registered users grouped by their organizations.
         </p>
       </div>
@@ -130,9 +130,9 @@ export default function UserManagement() {
                   <Card key={orgName} className="p-0 overflow-hidden border border-gray-200">
                     
                     {/* Organization Header */}
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                      <h3 className="font-extrabold text-gray-900 text-base">{orgName}</h3>
-                      <Badge variant="outline" className="text-gray-500 bg-white">
+                    <div className="bg-gray-50 dark:bg-slate-900 px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <h3 className="font-extrabold text-gray-900 dark:text-white text-base">{orgName}</h3>
+                      <Badge variant="outline" className="text-gray-500 dark:text-gray-200 bg-white dark:bg-slate-800">
                         {members.length} {members.length === 1 ? 'Member' : 'Members'}
                       </Badge>
                     </div>
@@ -140,7 +140,7 @@ export default function UserManagement() {
                     {/* Members Table */}
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-sm">
-                        <thead className="text-gray-400 border-b border-gray-50">
+                        <thead className="text-gray-400 dark:text-gray-300 border-b border-gray-50 dark:border-slate-700">
                           <tr>
                             <th className="px-6 py-3 font-semibold w-1/3">Name</th>
                             <th className="px-6 py-3 font-semibold w-1/3">Email</th>
@@ -150,9 +150,9 @@ export default function UserManagement() {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {members.map(member => (
-                            <tr key={member._id} className="hover:bg-gray-50 transition-colors group">
-                              <td className="px-6 py-4 font-semibold text-gray-800">{member.name}</td>
-                              <td className="px-6 py-4 text-gray-500">{member.email}</td>
+                            <tr key={member._id} className="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors group">
+                              <td className="px-6 py-4 font-semibold text-gray-800 dark:text-gray-100">{member.name}</td>
+                              <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{member.email}</td>
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-2">
                                   <Badge 

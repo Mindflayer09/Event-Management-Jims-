@@ -4,7 +4,7 @@ export default function Card({ children, className = '', onClick }) {
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow p-6 ${className}`}
+      className={`bg-white dark:bg-gray-800 rounded-xl shadow p-6 ${className}`}
     >
       {children}
     </div>
